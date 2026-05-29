@@ -1033,6 +1033,17 @@ function exportInventarioCompleto() {
   toast('Inventario exportado: ' + data.length, 'ok');
 }
 
+function toggleFisSort(col) {
+  if (!state.fisSort) state.fisSort = { col: 'ubi', dir: 'asc' };
+  if (state.fisSort.col === col) {
+    state.fisSort.dir = state.fisSort.dir === 'asc' ? 'desc' : 'asc';
+  } else {
+    state.fisSort.col = col;
+    state.fisSort.dir = (col === 'ubi' || col === 'sku') ? 'asc' : 'desc';
+  }
+  renderFisicoDesglose();
+}
+
 function renderFisicoDesglose() {
   if (!state.fisicoRaw) return;
   const q = (($('searchFis') && $('searchFis').value) || '').toUpperCase().trim();
@@ -1132,10 +1143,33 @@ function renderFisicoDesglose() {
     <div class="mini-stat"><div class="mini-stat-label">Σ Unidades contadas</div><div class="mini-stat-value">${fmt(totUnid)}</div></div>`;
   let data = rows;
   if (q) data = data.filter(r => r.sku.includes(q) || r.ubi.includes(q));
-  data = data.slice().sort((a,b)=>(a.ubi||'').localeCompare(b.ubi||''));
+  // Sort
+  const fs = state.fisSort || { col: 'ubi', dir: 'asc' };
+  const fDir = fs.dir === 'asc' ? 1 : -1;
+  const fcmpS = (x,y) => (x||'').localeCompare(y||'') * fDir;
+  const fcmpN = (x,y) => {
+    const xn = x === null || x === undefined ? null : Number(x);
+    const yn = y === null || y === undefined ? null : Number(y);
+    if (xn === null && yn === null) return 0;
+    if (xn === null) return 1;
+    if (yn === null) return -1;
+    return (xn - yn) * fDir;
+  };
+  data = data.slice().sort((x, y) => {
+    switch (fs.col) {
+      case 'ubi': return fcmpS(x.ubi, y.ubi) || fcmpS(x.sku, y.sku);
+      case 'sku': return fcmpS(x.sku, y.sku) || fcmpS(x.ubi, y.ubi);
+      case 'c1': return fcmpN(x.c1, y.c1) || fcmpS(x.ubi, y.ubi);
+      case 'c2': return fcmpN(x.c2, y.c2) || fcmpS(x.ubi, y.ubi);
+      case 'c3': return fcmpN(x.c3, y.c3) || fcmpS(x.ubi, y.ubi);
+      case 'final': return fcmpN(x.final, y.final) || fcmpS(x.ubi, y.ubi);
+      default: return fcmpS(x.ubi, y.ubi);
+    }
+  });
+  const fArr = c => fs.col === c ? (fs.dir === 'asc' ? ' ▲' : ' ▼') : ' ⇅';
   $('tablaFisicoDesglose').innerHTML = `<thead><tr>
-    <th>Ubicación</th><th>SKU</th>
-    <th class="num sist">1° Conteo</th><th class="num sist">2° Conteo</th><th class="num sist">3° Conteo</th><th class="num sist">Final</th>
+    <th onclick="toggleFisSort('ubi')" style="cursor:pointer;user-select:none">Ubicación${fArr('ubi')}</th><th onclick="toggleFisSort('sku')" style="cursor:pointer;user-select:none">SKU${fArr('sku')}</th>
+    <th class="num sist" onclick="toggleFisSort('c1')" style="cursor:pointer;user-select:none">1° Conteo${fArr('c1')}</th><th class="num sist" onclick="toggleFisSort('c2')" style="cursor:pointer;user-select:none">2° Conteo${fArr('c2')}</th><th class="num sist" onclick="toggleFisSort('c3')" style="cursor:pointer;user-select:none">3° Conteo${fArr('c3')}</th><th class="num sist" onclick="toggleFisSort('final')" style="cursor:pointer;user-select:none">Final${fArr('final')}</th>
   </tr></thead><tbody>${data.slice(0, 3000).map(r => `
     <tr>
       <td><strong>${r.ubi || '<vacío>'}</strong></td>
@@ -1565,17 +1599,65 @@ function setCruceFilter(v) {
   renderCruce();
 }
 
+function toggleTopSort(col) {
+  if (!state.topSort) state.topSort = { col: 'rank', dir: 'asc' };
+  if (state.topSort.col === col) {
+    state.topSort.dir = state.topSort.dir === 'asc' ? 'desc' : 'asc';
+  } else {
+    state.topSort.col = col;
+    state.topSort.dir = (col === 'sku' || col === 'ubi' || col === 'resultado') ? 'asc' : (col === 'rank' ? 'asc' : 'desc');
+  }
+  renderTopDif();
+}
+
 function renderTopDif() {
   if (!state.cruce) return;
-  const top = state.cruce.slice().filter(r => r.diferencia !== null && r.diferencia !== 0)
+  let top = state.cruce.slice().filter(r => r.diferencia !== null && r.diferencia !== 0)
     .sort((a, b) => Math.abs(b.diferencia || 0) - Math.abs(a.diferencia || 0))
     .slice(0, 20);
+  // Aplicar sort si el usuario lo cambió
+  const ts = state.topSort || { col: 'rank', dir: 'asc' };
+  if (ts.col !== 'rank') {
+    const tDir = ts.dir === 'asc' ? 1 : -1;
+    const tcS = (x,y) => (x||'').localeCompare(y||'') * tDir;
+    const tcN = (x,y) => {
+      const xn = x === null || x === undefined ? null : Number(x);
+      const yn = y === null || y === undefined ? null : Number(y);
+      if (xn === null && yn === null) return 0;
+      if (xn === null) return 1;
+      if (yn === null) return -1;
+      return (xn - yn) * tDir;
+    };
+    top = top.slice().sort((x, y) => {
+      switch (ts.col) {
+        case 'sku': return tcS(x.sku, y.sku);
+        case 'ubi': return tcS(x.ubicacion, y.ubicacion);
+        case 'sistema': return tcN(x.sistemaU, y.sistemaU);
+        case 'contado': return tcN(x.contadoU, y.contadoU);
+        case 'diferencia': return tcN(x.diferencia, y.diferencia);
+        case 'resultado': return tcS(x.resultado, y.resultado);
+      }
+      return 0;
+    });
+  }
   if (top.length === 0) {
     document.getElementById('tablaTopDif').innerHTML = '<thead><tr><th>—</th></tr></thead><tbody><tr><td>Sin diferencias para mostrar</td></tr></tbody>';
     return;
   }
   const RES_LABEL = { ok: 'OK', faltante: 'FALTANTE', sobrante: 'SOBRANTE', no_contado: 'NO CONTADO', solo_fisico: 'SOLO FÍSICO' };
-  document.getElementById('tablaTopDif').innerHTML = `<thead><tr><th>#</th><th>SKU</th><th>Ubicación</th><th class="num sist">Sistema</th><th class="num sist">Contado</th><th class="num sist">Diferencia</th><th>Resultado</th></tr></thead><tbody>${top.map((r, i) => `<tr><td><strong>${i + 1}</strong></td><td><strong>${r.sku || ''}</strong></td><td class="ubi-dif">${r.ubicacion || ''}</td><td class="num sist">${r.sistemaU !== null ? fmt(r.sistemaU) : 0}</td><td class="num sist">${r.contadoU !== null ? fmt(r.contadoU) : 0}</td><td class="num sist diff-real">${(r.diferencia > 0 ? '+' : '') + fmt(r.diferencia)}</td><td>${badgeRes(r.resultado)}</td></tr>`).join('')}</tbody>`;
+  const tArr = c => (state.topSort || {}).col === c ? ((state.topSort||{}).dir === 'asc' ? ' ▲' : ' ▼') : ' ⇅';
+  document.getElementById('tablaTopDif').innerHTML = `<thead><tr><th onclick="toggleTopSort('rank')" style="cursor:pointer;user-select:none">#${tArr('rank')}</th><th onclick="toggleTopSort('sku')" style="cursor:pointer;user-select:none">SKU${tArr('sku')}</th><th onclick="toggleTopSort('ubi')" style="cursor:pointer;user-select:none">Ubicación${tArr('ubi')}</th><th class="num sist" onclick="toggleTopSort('sistema')" style="cursor:pointer;user-select:none">Sistema${tArr('sistema')}</th><th class="num sist" onclick="toggleTopSort('contado')" style="cursor:pointer;user-select:none">Contado${tArr('contado')}</th><th class="num sist" onclick="toggleTopSort('diferencia')" style="cursor:pointer;user-select:none">Diferencia${tArr('diferencia')}</th><th onclick="toggleTopSort('resultado')" style="cursor:pointer;user-select:none">Resultado${tArr('resultado')}</th></tr></thead><tbody>${top.map((r, i) => `<tr><td><strong>${i + 1}</strong></td><td><strong>${r.sku || ''}</strong></td><td class="ubi-dif">${r.ubicacion || ''}</td><td class="num sist">${r.sistemaU !== null ? fmt(r.sistemaU) : 0}</td><td class="num sist">${r.contadoU !== null ? fmt(r.contadoU) : 0}</td><td class="num sist diff-real">${(r.diferencia > 0 ? '+' : '') + fmt(r.diferencia)}</td><td>${badgeRes(r.resultado)}</td></tr>`).join('')}</tbody>`;
+}
+
+function toggleRsSort(col) {
+  if (!state.rsSort) state.rsSort = { col: 'diff', dir: 'desc' };
+  if (state.rsSort.col === col) {
+    state.rsSort.dir = state.rsSort.dir === 'asc' ? 'desc' : 'asc';
+  } else {
+    state.rsSort.col = col;
+    state.rsSort.dir = col === 'sku' ? 'asc' : 'desc';
+  }
+  renderResSKU();
 }
 
 function renderResSKU() {
@@ -1590,8 +1672,17 @@ function renderResSKU() {
     if (r.resultado === 'ok') bySku[k].ubisOk += 1;
     else if (r.diferencia !== null && r.diferencia !== 0) bySku[k].ubisDif += 1;
   });
-  const list = Object.values(bySku).sort((a, b) => Math.abs(b.diff) - Math.abs(a.diff));
-  document.getElementById('tablaResSKU').innerHTML = `<thead><tr><th>SKU</th><th class="num sist">Ubic. OK</th><th class="num sist">Ubic. con dif</th><th class="num sist">Sistema</th><th class="num sist">Contado</th><th class="num sist">Desvío neto</th></tr></thead><tbody>${list.map(s => `<tr><td><strong>${s.sku}</strong></td><td class="num sist">${fmt(s.ubisOk)}</td><td class="num sist ${s.ubisDif > 0 ? 'ubi-dif' : ''}">${fmt(s.ubisDif)}</td><td class="num sist">${fmt(s.sistema)}</td><td class="num sist">${fmt(s.contado)}</td><td class="num sist ${s.diff === 0 ? 'diff-zero' : 'diff-real'}">${(s.diff > 0 ? '+' : '') + fmt(s.diff)}</td></tr>`).join('')}</tbody>`;
+  let list = Object.values(bySku);
+  const rs = state.rsSort || { col: 'diff', dir: 'desc' };
+  const rDir = rs.dir === 'asc' ? 1 : -1;
+  list = list.sort((x, y) => {
+    if (rs.col === 'sku') return (x.sku||'').localeCompare(y.sku||'') * rDir;
+    const xn = Number(x[rs.col] || 0), yn = Number(y[rs.col] || 0);
+    if (rs.col === 'diff') return (Math.abs(yn) - Math.abs(xn)) * (rDir);
+    return (xn - yn) * rDir;
+  });
+  const rsArr = c => rs.col === c ? (rs.dir === 'asc' ? ' ▲' : ' ▼') : ' ⇅';
+  document.getElementById('tablaResSKU').innerHTML = `<thead><tr><th onclick="toggleRsSort('sku')" style="cursor:pointer;user-select:none">SKU${rsArr('sku')}</th><th class="num sist" onclick="toggleRsSort('ubisOk')" style="cursor:pointer;user-select:none">Ubic. OK${rsArr('ubisOk')}</th><th class="num sist" onclick="toggleRsSort('ubisDif')" style="cursor:pointer;user-select:none">Ubic. con dif${rsArr('ubisDif')}</th><th class="num sist" onclick="toggleRsSort('sistema')" style="cursor:pointer;user-select:none">Sistema${rsArr('sistema')}</th><th class="num sist" onclick="toggleRsSort('contado')" style="cursor:pointer;user-select:none">Contado${rsArr('contado')}</th><th class="num sist" onclick="toggleRsSort('diff')" style="cursor:pointer;user-select:none">Desvío neto${rsArr('diff')}</th></tr></thead><tbody>${list.map(s => `<tr><td><strong>${s.sku}</strong></td><td class="num sist">${fmt(s.ubisOk)}</td><td class="num sist ${s.ubisDif > 0 ? 'ubi-dif' : ''}">${fmt(s.ubisDif)}</td><td class="num sist">${fmt(s.sistema)}</td><td class="num sist">${fmt(s.contado)}</td><td class="num sist ${s.diff === 0 ? 'diff-zero' : 'diff-real'}">${(s.diff > 0 ? '+' : '') + fmt(s.diff)}</td></tr>`).join('')}</tbody>`;
 }
 
 function toggleCruceSort(col) {
@@ -1696,10 +1787,47 @@ function renderAlcance() {
   }
 }
 
+function toggleAjustesSort(col) {
+  if (!state.ajustesSort) state.ajustesSort = { col: 'ubi', dir: 'asc' };
+  if (state.ajustesSort.col === col) {
+    state.ajustesSort.dir = state.ajustesSort.dir === 'asc' ? 'desc' : 'asc';
+  } else {
+    state.ajustesSort.col = col;
+    state.ajustesSort.dir = (col === 'sku' || col === 'ubi' || col === 'descripcion' || col === 'accion' || col === 'obs') ? 'asc' : 'desc';
+  }
+  renderAjustes();
+}
+
 function renderAjustes() {
   if (!state.cruce) return;
-  const a = state.cruce.filter(r=>(r.resultado==='faltante'||r.resultado==='sobrante'||r.resultado==='solo_fisico')&&r.ajustado!=='S'&&r.ajustado!=='SI');
-  $('tablaAjustes').innerHTML = `<thead><tr><th>SKU</th><th>Descripción</th><th>Ubicación</th><th class="num">Sistema</th><th class="num">Contado</th><th class="num">Diferencia</th><th>Acción</th><th>Obs</th></tr></thead><tbody>${a.map(r=>{const ac=r.resultado==='faltante'?'Ajuste negativo':r.resultado==='sobrante'?'Ajuste positivo':'Investigar';return `<tr><td><strong>${r.sku}</strong></td><td>${r.descripcion||''}</td><td>${r.ubicacion||''}</td><td class="num sist">${fmt(r.sistemaU)}</td><td class="num">${fmt(r.contadoU)}</td><td class="num ${r.diferencia>0?'diff-neg':'diff-pos'}">${(r.diferencia>0?'+':'')+fmt(r.diferencia)}</td><td>${ac}</td><td>${r.observaciones||''}</td></tr>`;}).join('')}</tbody>`;
+  let a = state.cruce.filter(r=>(r.resultado==='faltante'||r.resultado==='sobrante'||r.resultado==='solo_fisico')&&r.ajustado!=='S'&&r.ajustado!=='SI');
+  const accionOf = r => r.resultado==='faltante'?'Ajuste negativo':r.resultado==='sobrante'?'Ajuste positivo':'Investigar';
+  const sa = state.ajustesSort || { col: 'ubi', dir: 'asc' };
+  const dirMul = sa.dir === 'asc' ? 1 : -1;
+  const cmpS = (x, y) => (x||'').localeCompare(y||'') * dirMul;
+  const cmpN = (x, y) => {
+    const xn = x === null || x === undefined ? null : Number(x);
+    const yn = y === null || y === undefined ? null : Number(y);
+    if (xn === null && yn === null) return 0;
+    if (xn === null) return 1;
+    if (yn === null) return -1;
+    return (xn - yn) * dirMul;
+  };
+  a = a.slice().sort((x, y) => {
+    switch (sa.col) {
+      case 'sku': return cmpS(x.sku, y.sku) || cmpS(x.ubicacion, y.ubicacion);
+      case 'descripcion': return cmpS(x.descripcion, y.descripcion) || cmpS(x.ubicacion, y.ubicacion);
+      case 'ubi': return cmpS(x.ubicacion, y.ubicacion) || cmpS(x.sku, y.sku);
+      case 'sistema': return cmpN(x.sistemaU, y.sistemaU) || cmpS(x.ubicacion, y.ubicacion);
+      case 'contado': return cmpN(x.contadoU, y.contadoU) || cmpS(x.ubicacion, y.ubicacion);
+      case 'diferencia': return cmpN(x.diferencia, y.diferencia) || cmpS(x.ubicacion, y.ubicacion);
+      case 'accion': return cmpS(accionOf(x), accionOf(y)) || cmpS(x.ubicacion, y.ubicacion);
+      case 'obs': return cmpS(x.observaciones, y.observaciones) || cmpS(x.ubicacion, y.ubicacion);
+      default: return cmpS(x.ubicacion, y.ubicacion);
+    }
+  });
+  const arr = c => sa.col === c ? (sa.dir === 'asc' ? ' ▲' : ' ▼') : ' ⇅';
+  $('tablaAjustes').innerHTML = `<thead><tr><th onclick="toggleAjustesSort('sku')" style="cursor:pointer;user-select:none">SKU${arr('sku')}</th><th onclick="toggleAjustesSort('descripcion')" style="cursor:pointer;user-select:none">Descripción${arr('descripcion')}</th><th onclick="toggleAjustesSort('ubi')" style="cursor:pointer;user-select:none">Ubicación${arr('ubi')}</th><th class="num sist" onclick="toggleAjustesSort('sistema')" style="cursor:pointer;user-select:none">Sistema${arr('sistema')}</th><th class="num sist" onclick="toggleAjustesSort('contado')" style="cursor:pointer;user-select:none">Contado${arr('contado')}</th><th class="num sist" onclick="toggleAjustesSort('diferencia')" style="cursor:pointer;user-select:none">Diferencia${arr('diferencia')}</th><th onclick="toggleAjustesSort('accion')" style="cursor:pointer;user-select:none">Acción${arr('accion')}</th><th onclick="toggleAjustesSort('obs')" style="cursor:pointer;user-select:none">Obs${arr('obs')}</th></tr></thead><tbody>${a.map(r=>{const ac=accionOf(r);const ubiCls=r.resultado==='ok'?'ubi-ok':r.resultado==='no_contado'?'ubi-nc':(r.resultado==='faltante'||r.resultado==='sobrante'||r.resultado==='solo_fisico')?'ubi-dif':'';return `<tr><td><strong>${r.sku}</strong></td><td>${r.descripcion||''}</td><td class="${ubiCls}">${r.ubicacion||''}</td><td class="num sist">${fmt(r.sistemaU)}</td><td class="num sist">${fmt(r.contadoU)}</td><td class="num sist ${r.diferencia===null?'diff-nc':r.diferencia===0?'diff-zero':'diff-real'}">${r.diferencia===null?'—':(r.diferencia>0?'+':'')+fmt(r.diferencia)}</td><td>${ac}</td><td>${r.observaciones||''}</td></tr>`;}).join('')}</tbody>`;
 }
 
 function buildWB(data, sn) { const wb = XLSX.utils.book_new(); const ws = XLSX.utils.json_to_sheet(data); XLSX.utils.book_append_sheet(wb, ws, sn); return wb; }
@@ -1740,7 +1868,16 @@ function exportResSKU() {
     if (r.resultado === 'ok') bySku[k].ubisOk += 1;
     else if (r.diferencia !== null && r.diferencia !== 0) bySku[k].ubisDif += 1;
   });
-  const list = Object.values(bySku).sort((a, b) => Math.abs(b.diff) - Math.abs(a.diff));
+  let list = Object.values(bySku);
+  const rs = state.rsSort || { col: 'diff', dir: 'desc' };
+  const rDir = rs.dir === 'asc' ? 1 : -1;
+  list = list.sort((x, y) => {
+    if (rs.col === 'sku') return (x.sku||'').localeCompare(y.sku||'') * rDir;
+    const xn = Number(x[rs.col] || 0), yn = Number(y[rs.col] || 0);
+    if (rs.col === 'diff') return (Math.abs(yn) - Math.abs(xn)) * (rDir);
+    return (xn - yn) * rDir;
+  });
+  const rsArr = c => rs.col === c ? (rs.dir === 'asc' ? ' ▲' : ' ▼') : ' ⇅';
   const d = list.map(s => ({
     'SKU': s.sku,
     'Ubic. OK': s.ubisOk,
