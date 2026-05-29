@@ -1293,19 +1293,24 @@ function renderResumen() {
   const exg = sumSc > 0 ? 1 - sumDA/sumSc : null;
   const cob = s.total > 0 ? (s.total - s.nc) / s.total : 0;
   const hall = s.falt + s.sob;
-  let masterKpi = '';
-  if (state.cobertura) {
-    const cobMaster = ((state.cobertura.filter(x=>x.enFisico).length / state.cobertura.length) * 100).toFixed(1);
-    const ncStock = state.cobertura.filter(x=>x.estado==='NO_CONTADA_CON_STOCK').length;
-    masterKpi = `<div class="kpi-card ${ncStock>0?'danger':'success'}"><div class="kpi-label">Cobertura Master</div><div class="kpi-value">${cobMaster}%</div><div class="kpi-sub">${ncStock} con stock sin contar</div></div>`;
+  // Tarjetas de ubicaciones master
+  let ubiKpis = '';
+  if (state.masterIdx) {
+    const totalUbis = Object.keys(state.masterIdx).length;
+    const contadasUbis = state.cobertura ? state.cobertura.filter(x => x.enFisico).length : 0;
+    const restantes = totalUbis - contadasUbis;
+    ubiKpis = `
+      <div class="kpi-card"><div class="kpi-label">Ubicaciones totales</div><div class="kpi-value">${fmt(totalUbis)}</div><div class="kpi-sub">del master</div></div>
+      <div class="kpi-card success"><div class="kpi-label">Contadas</div><div class="kpi-value">${fmt(contadasUbis)}</div><div class="kpi-sub">${totalUbis>0?(contadasUbis/totalUbis*100).toFixed(1):0}% del master</div></div>
+      <div class="kpi-card warning"><div class="kpi-label">Restantes</div><div class="kpi-value">${fmt(restantes)}</div><div class="kpi-sub">sin contar</div></div>`;
   }
+  let masterKpi = ubiKpis;
   $('kpiGrid').innerHTML = `
     <div class="kpi-card"><div class="kpi-label">Posiciones</div><div class="kpi-value">${fmt(s.total)}</div><div class="kpi-sub">SKU × Ubicación</div></div>
     <div class="kpi-card success"><div class="kpi-label">OK</div><div class="kpi-value">${fmt(s.ok)}</div><div class="kpi-sub">${s.total?(s.ok/s.total*100).toFixed(1):0}%</div></div>
     <div class="kpi-card danger"><div class="kpi-label">Hallazgos</div><div class="kpi-value">${fmt(hall)}</div><div class="kpi-sub">${s.falt} falt · ${s.sob} sobr</div></div>
     <div class="kpi-card warning"><div class="kpi-label">No contado</div><div class="kpi-value">${fmt(s.nc)}</div><div class="kpi-sub">sin conteo</div></div>
     <div class="kpi-card"><div class="kpi-label">Exactitud</div><div class="kpi-value">${exg!==null?fmtPct(exg):'—'}</div><div class="kpi-sub">1−|Δ|/Sistema</div></div>
-    <div class="kpi-card"><div class="kpi-label">Cobertura SKU+Ubi</div><div class="kpi-value">${fmtPct(cob)}</div><div class="kpi-sub">${fmt(s.total-s.nc)}/${fmt(s.total)}</div></div>
     ${masterKpi}
     <div class="kpi-card"><div class="kpi-label">Σ Unid. sistema</div><div class="kpi-value">${fmt(sumSt)}</div><div class="kpi-sub">cruzadas: ${fmt(sumSc)}</div></div>
     <div class="kpi-card"><div class="kpi-label">Σ Unid. contadas</div><div class="kpi-value">${fmt(sumCt)}</div><div class="kpi-sub">Δ: ${fmt(sumSc-sumCc)}</div></div>`;
