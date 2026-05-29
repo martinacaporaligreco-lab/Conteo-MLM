@@ -77,6 +77,9 @@ tbody tr:hover { background: #f8faff; }
 .num.sist { text-align: center; }
 .ubi-ok { color: #1e7e3b; font-weight: 700; }
 .ubi-dif { color: #c0392b; font-weight: 700; }
+.chip { padding: 5px 12px; border-radius: 16px; background: #eef2f7; color: #1a2540; font-size: 12px; font-weight: 600; cursor: pointer; user-select: none; border: 1px solid transparent; transition: all .15s; }
+.chip:hover { background: #dfe6ef; }
+.chip.active { background: #1e3a5f; color: #fff; border-color: #1e3a5f; }
 ::-webkit-scrollbar-button { display: none; }
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-thumb { background: #cdd5e0; border-radius: 4px; }
@@ -306,13 +309,31 @@ tbody tr:hover { background: #f8faff; }
   </div>
   <div class="panel" id="panel-cruce">
     <div class="section-card">
+      <div class="section-title">🏆 Top 20 mayores diferencias</div>
+      <div class="section-desc">Las 20 ubicaciones con mayor diferencia absoluta. Foco rápido en lo más importante.</div>
+      <div class="table-wrap"><table id="tablaTopDif"></table></div>
+    </div>
+    <div class="section-card">
+      <div class="section-title">📦 Resumen por SKU</div>
+      <div class="section-desc">Cantidad de ubicaciones con diferencia, total sistémico vs físico, y desvío neto por SKU.</div>
+      <div class="table-wrap" style="max-height:400px"><table id="tablaResSKU"></table></div>
+    </div>
+    <div class="section-card">
       <div class="section-title">Cruce Sistema ↔ Físico <button class="btn-export" onclick="exportCruce()">⬇ Exportar Excel</button></div>
       <div class="section-desc">Una fila por par SKU + Ubicación. Diferencia = Sistema − Conteo Final.</div>
+      <div class="filter-chips" id="cruceChips" style="display:flex;gap:6px;flex-wrap:wrap;margin:8px 0 12px">
+        <span class="chip" data-fl="" onclick="setCruceFilter('')">Todos</span>
+        <span class="chip" data-fl="dif" onclick="setCruceFilter('dif')">Con diferencia</span>
+        <span class="chip" data-fl="ok" onclick="setCruceFilter('ok')">OK</span>
+        <span class="chip" data-fl="faltante" onclick="setCruceFilter('faltante')">Faltantes</span>
+        <span class="chip" data-fl="sobrante" onclick="setCruceFilter('sobrante')">Sobrantes</span>
+        <span class="chip" data-fl="solo_fisico" onclick="setCruceFilter('solo_fisico')">Solo físico</span>
+        <span class="chip" data-fl="no_contado" onclick="setCruceFilter('no_contado')">No contado</span>
+      </div>
       <div class="toolbar">
         <input type="text" class="search" id="searchCruce" placeholder="🔍 Buscar SKU o ubicación..." oninput="renderCruce()">
-        <select id="filtroCruce" onchange="renderCruce()">
-          <option value="">Todos</option><option value="ok">Solo OK</option><option value="dif">Con diferencia</option>
-          <option value="faltante">Faltantes</option><option value="sobrante">Sobrantes</option><option value="no_contado">No contado</option>
+        <select id="filtroCruce" onchange="renderCruce()" style="display:none">
+          <option value="">Todos</option>
         </select>
       </div>
       <div class="table-wrap"><table id="tablaCruce"></table></div>
@@ -878,7 +899,7 @@ function ejecutarControl() {
 
 function badgeRes(r) { return ({ ok:'<span class="badge badge-ok">OK</span>', faltante:'<span class="badge badge-err">FALTANTE</span>', sobrante:'<span class="badge badge-warn">SOBRANTE</span>', no_contado:'<span class="badge badge-missing">NO CONTADO</span>', solo_fisico:'<span class="badge badge-warn">SOLO FÍSICO</span>' })[r] || r; }
 
-function renderAll() { renderResumen(); renderInventarioCompleto(); renderFisicoDesglose(); renderBases(); renderCruce(); renderHallazgos(); renderAlcance(); renderAjustes(); }
+function renderAll() { renderResumen(); renderInventarioCompleto(); renderFisicoDesglose(); renderBases(); renderTopDif(); renderResSKU(); renderCruce(); renderHallazgos(); renderAlcance(); renderAjustes(); }
 
 function buildInventarioCompleto() {
   // Combina master + cruce → una fila por ubicación con SKU principal y stock
@@ -1532,6 +1553,42 @@ function renderPreviewTable(id, data, cols, lim) {
   $(id).innerHTML = h + b;
 }
 
+function setCruceFilter(v) {
+  const sel = document.getElementById('filtroCruce');
+  if (sel) sel.value = v;
+  document.querySelectorAll('#cruceChips .chip').forEach(c => c.classList.toggle('active', (c.getAttribute('data-fl') || '') === v));
+  renderCruce();
+}
+
+function renderTopDif() {
+  if (!state.cruce) return;
+  const top = state.cruce.slice().filter(r => r.diferencia !== null && r.diferencia !== 0)
+    .sort((a, b) => Math.abs(b.diferencia || 0) - Math.abs(a.diferencia || 0))
+    .slice(0, 20);
+  if (top.length === 0) {
+    document.getElementById('tablaTopDif').innerHTML = '<thead><tr><th>—</th></tr></thead><tbody><tr><td>Sin diferencias para mostrar</td></tr></tbody>';
+    return;
+  }
+  const RES_LABEL = { ok: 'OK', faltante: 'FALTANTE', sobrante: 'SOBRANTE', no_contado: 'NO CONTADO', solo_fisico: 'SOLO FÍSICO' };
+  document.getElementById('tablaTopDif').innerHTML = `<thead><tr><th>#</th><th>SKU</th><th>Ubicación</th><th class="num sist">Sistema</th><th class="num sist">Contado</th><th class="num sist">Diferencia</th><th>Resultado</th></tr></thead><tbody>${top.map((r, i) => `<tr><td><strong>${i + 1}</strong></td><td><strong>${r.sku || ''}</strong></td><td class="ubi-dif">${r.ubicacion || ''}</td><td class="num sist">${r.sistemaU !== null ? fmt(r.sistemaU) : 0}</td><td class="num sist">${r.contadoU !== null ? fmt(r.contadoU) : 0}</td><td class="num sist diff-neg">${(r.diferencia > 0 ? '+' : '') + fmt(r.diferencia)}</td><td>${badgeRes(r.resultado)}</td></tr>`).join('')}</tbody>`;
+}
+
+function renderResSKU() {
+  if (!state.cruce) return;
+  const bySku = {};
+  state.cruce.forEach(r => {
+    const k = r.sku || '(sin sku)';
+    if (!bySku[k]) bySku[k] = { sku: k, ubisDif: 0, ubisOk: 0, sistema: 0, contado: 0, diff: 0 };
+    bySku[k].sistema += r.sistemaU || 0;
+    bySku[k].contado += r.contadoU || 0;
+    bySku[k].diff += r.diferencia || 0;
+    if (r.resultado === 'ok') bySku[k].ubisOk += 1;
+    else if (r.diferencia !== null && r.diferencia !== 0) bySku[k].ubisDif += 1;
+  });
+  const list = Object.values(bySku).sort((a, b) => Math.abs(b.diff) - Math.abs(a.diff));
+  document.getElementById('tablaResSKU').innerHTML = `<thead><tr><th>SKU</th><th class="num sist">Ubic. OK</th><th class="num sist">Ubic. con dif</th><th class="num sist">Sistema</th><th class="num sist">Contado</th><th class="num sist">Desvío neto</th></tr></thead><tbody>${list.map(s => `<tr><td><strong>${s.sku}</strong></td><td class="num sist">${fmt(s.ubisOk)}</td><td class="num sist ${s.ubisDif > 0 ? 'ubi-dif' : ''}">${fmt(s.ubisDif)}</td><td class="num sist">${fmt(s.sistema)}</td><td class="num sist">${fmt(s.contado)}</td><td class="num sist ${s.diff > 0 ? 'diff-neg' : s.diff < 0 ? 'diff-pos' : 'diff-zero'}">${(s.diff > 0 ? '+' : '') + fmt(s.diff)}</td></tr>`).join('')}</tbody>`;
+}
+
 function toggleCruceSort(col) {
   if (!state.cruceSort) state.cruceSort = { col: 'ubi', dir: 'asc' };
   if (state.cruceSort.col === col) {
@@ -1545,6 +1602,9 @@ function toggleCruceSort(col) {
 
 function renderCruce() {
   if (!state.cruce) return;
+  // Marcar chip activa
+  const curFl = ($('filtroCruce') && $('filtroCruce').value) || '';
+  document.querySelectorAll('#cruceChips .chip').forEach(c => c.classList.toggle('active', (c.getAttribute('data-fl') || '') === curFl));
   const q = ($('searchCruce').value||'').toUpperCase().trim();
   const fl = $('filtroCruce').value;
   let d = state.cruce;
