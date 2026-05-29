@@ -1,1 +1,1638 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Conteo Físico Stock — MLM México</title>
+<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f5f7fa; color: #1a2540; min-height: 100vh; }
+.header { background: linear-gradient(135deg, #1e3a5f 0%, #2a4a7a 100%); color: #fff; padding: 18px 32px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 2px 8px rgba(0,0,0,.1); }
+.header-left { display: flex; align-items: center; gap: 16px; }
+.header-icon { width: 56px; height: 56px; background: #f5d563; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 28px; }
+.header-title { font-size: 22px; font-weight: 700; letter-spacing: -.3px; }
+.header-subtitle { font-size: 13px; opacity: .85; margin-top: 2px; }
+.header-right { display: flex; align-items: center; gap: 16px; }
+.exec-status { font-size: 13px; opacity: .9; }
+.btn-new { background: #2d4a73; color: #fff; border: 1px solid #4a6b94; padding: 10px 18px; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 500; }
+.btn-new:hover { background: #3a5a85; }
+.tabs { background: #fff; padding: 0 32px; display: flex; gap: 4px; border-bottom: 1px solid #e5e9f0; overflow-x: auto; }
+.tab { padding: 16px 18px; cursor: pointer; font-size: 14px; font-weight: 500; color: #5a6378; border-bottom: 3px solid transparent; display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+.tab:hover { color: #1a2540; }
+.tab.active { color: #1e3a5f; border-bottom-color: #1e3a5f; }
+.tab-badge { background: #4a90e2; color: #fff; width: 22px; height: 22px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; }
+.tab.active .tab-badge { background: #1e3a5f; }
+.config-bar { background: #fff; margin: 20px 32px 0; padding: 18px 22px; border-radius: 10px; border: 1px solid #e5e9f0; display: flex; align-items: center; gap: 24px; flex-wrap: wrap; }
+.config-item { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.config-item label { color: #5a6378; font-weight: 500; }
+.config-item select, .config-item input { border: 1px solid #d4dae3; padding: 7px 10px; border-radius: 6px; font-size: 13px; font-family: inherit; color: #1a2540; }
+.config-item input { width: 120px; }
+.config-item input.wide { width: 200px; }
+.config-meta { color: #8590a8; font-size: 12px; margin-left: auto; }
+.upload-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; margin: 16px 32px 0; }
+.upload-card { background: #fff; border: 2px dashed #c7d0dd; border-radius: 12px; padding: 22px 18px; text-align: center; transition: all .2s; }
+.upload-card.loaded { border-style: solid; border-color: #2ecc71; background: #f0faf4; }
+.upload-card.error { border-color: #e74c3c; background: #fdf2f1; }
+.upload-card.dragover { border-color: #4a90e2; background: #eef5ff; }
+.upload-icon { font-size: 32px; margin-bottom: 8px; display: block; }
+.upload-title { font-size: 14px; font-weight: 700; margin-bottom: 4px; letter-spacing: .3px; }
+.upload-subtitle { font-size: 11px; color: #5a6378; margin-bottom: 12px; font-family: ui-monospace, monospace; }
+.btn-load { background: #4a90e2; color: #fff; border: none; padding: 8px 20px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 500; display: inline-block; text-align: center; user-select: none; }
+.btn-load:hover { background: #3a7fd1; }
+.upload-status { font-size: 11px; color: #8590a8; margin-top: 8px; word-break: break-word; }
+.upload-card.loaded .upload-status { color: #2ecc71; font-weight: 600; }
+.exec-bar { margin: 20px 32px; display: flex; align-items: center; gap: 16px; }
+.btn-exec { background: #6c7787; color: #fff; border: none; padding: 12px 28px; border-radius: 8px; cursor: not-allowed; font-size: 14px; font-weight: 600; }
+.btn-exec.ready { background: #1e3a5f; cursor: pointer; }
+.btn-exec.ready:hover { background: #2a4a7a; }
+.exec-msg { font-size: 13px; color: #5a6378; }
+.content { margin: 20px 32px 40px; }
+.panel { display: none; }
+.panel.active { display: block; }
+.kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 18px; }
+.kpi-card { background: #fff; border-radius: 8px; padding: 10px 12px; border: 1px solid #e5e9f0; border-left: 3px solid #4a90e2; }
+.kpi-card.success { border-left-color: #2ecc71; }
+.kpi-card.warning { border-left-color: #f39c12; }
+.kpi-card.danger { border-left-color: #e74c3c; }
+.kpi-label { font-size: 10px; color: #5a6378; font-weight: 600; margin-bottom: 2px; text-transform: uppercase; letter-spacing: .3px; }
+.kpi-value { font-size: 18px; font-weight: 700; color: #1a2540; line-height: 1.1; }
+.kpi-sub { font-size: 10px; color: #8590a8; margin-top: 2px; }
+.section-card { background: #fff; border-radius: 10px; padding: 20px 24px; border: 1px solid #e5e9f0; margin-bottom: 16px; }
+.section-title { font-size: 15px; font-weight: 700; margin-bottom: 4px; color: #1a2540; display: flex; align-items: center; justify-content: space-between; }
+.section-desc { font-size: 12px; color: #5a6378; margin-bottom: 14px; }
+.toolbar { display: flex; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; align-items: center; }
+.toolbar input, .toolbar select { border: 1px solid #d4dae3; padding: 8px 12px; border-radius: 6px; font-size: 13px; font-family: inherit; }
+.toolbar input.search { flex: 1; min-width: 200px; }
+.btn-export { background: #2ecc71; color: #fff; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 500; }
+.btn-export:hover { background: #27ae60; }
+.table-wrap { overflow: auto; border: 1px solid #e5e9f0; border-radius: 8px; max-height: 600px; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+thead { background: #f5f7fa; position: sticky; top: 0; z-index: 1; }
+th { padding: 10px 12px; text-align: left; font-weight: 600; color: #1a2540; font-size: 12px; text-transform: uppercase; border-bottom: 2px solid #d4dae3; white-space: nowrap; }
+td { padding: 9px 12px; border-bottom: 1px solid #eef1f6; color: #1a2540; }
+tbody tr:hover { background: #f8faff; }
+.num { text-align: right; font-variant-numeric: tabular-nums; font-family: ui-monospace, monospace; }
+.diff-neg { color: #e74c3c; font-weight: 600; }
+.diff-pos { color: #f39c12; font-weight: 600; }
+.diff-zero { color: #2ecc71; }
+.badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; }
+.badge-ok { background: #d4f5e0; color: #1e7e3b; }
+.badge-warn { background: #fff3cd; color: #856404; }
+.badge-err { background: #fadbd8; color: #b03a2e; }
+.badge-missing { background: #e9ecef; color: #5a6378; }
+.empty-state { text-align: center; padding: 60px 20px; color: #8590a8; }
+.empty-state .icon { font-size: 48px; margin-bottom: 12px; }
+.empty-state h3 { font-size: 16px; color: #5a6378; margin-bottom: 6px; }
+.summary-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 14px; }
+.mini-stat { background: #f8faff; border: 1px solid #e5e9f0; border-radius: 8px; padding: 10px 12px; }
+.mini-stat-label { font-size: 10px; color: #5a6378; text-transform: uppercase; letter-spacing: .3px; }
+.mini-stat-value { font-size: 16px; font-weight: 700; color: #1a2540; margin-top: 3px; font-variant-numeric: tabular-nums; }
+.legend { display: flex; gap: 14px; font-size: 12px; color: #5a6378; margin-top: 12px; flex-wrap: wrap; }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+.dot-green { background: #2ecc71; } .dot-yellow { background: #f39c12; } .dot-red { background: #e74c3c; } .dot-gray { background: #b0b8c5; }
+.toast { position: fixed; bottom: 24px; right: 24px; background: #1e3a5f; color: #fff; padding: 14px 22px; border-radius: 8px; font-size: 14px; box-shadow: 0 6px 18px rgba(0,0,0,.2); z-index: 1000; opacity: 0; pointer-events: none; transition: opacity .25s; max-width: 400px; }
+.toast.show { opacity: 1; } .toast.err { background: #e74c3c; } .toast.ok { background: #2ecc71; }
+.footer { text-align: center; padding: 20px; font-size: 12px; color: #8590a8; }
+.diag-banner { background: #fff3cd; border: 1px solid #f39c12; border-radius: 6px; padding: 10px 14px; margin-top: 10px; font-size: 13px; color: #856404; }
 
+/* Dashboard widgets */
+.dashboard-row { display: grid; grid-template-columns: 320px 1fr; gap: 16px; margin-bottom: 16px; }
+.donut-card { background: #fff; border: 1px solid #e5e9f0; border-radius: 10px; padding: 18px; }
+.donut-title { font-size: 11px; color: #5a6378; font-weight: 600; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 10px; text-align: center; }
+.donut-wrap { display: flex; align-items: center; gap: 18px; }
+.donut-svg { width: 130px; height: 130px; flex-shrink: 0; }
+.donut-stats { flex: 1; font-size: 13px; line-height: 1.6; }
+.donut-stats strong { font-size: 22px; color: #1a2540; }
+.bars-card { background: #fff; border: 1px solid #e5e9f0; border-radius: 10px; padding: 18px; }
+.bar-row { display: grid; grid-template-columns: 90px 60px 1fr; gap: 10px; align-items: center; font-size: 13px; margin-bottom: 8px; }
+.bar-label { font-weight: 600; color: #1a2540; }
+.bar-pct { font-weight: 700; font-variant-numeric: tabular-nums; }
+.bar-track { background: #f0f3f7; height: 10px; border-radius: 5px; overflow: hidden; position: relative; }
+.bar-fill { height: 100%; transition: width .4s; }
+.bar-detail { font-size: 11px; color: #8590a8; margin-top: 2px; }
+
+.sku-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-bottom: 16px; }
+.sku-card { background: #fff; border: 1px solid #e5e9f0; border-top: 4px solid #4a90e2; border-radius: 8px; padding: 14px 16px; position: relative; }
+.sku-card.dif-pos { border-top-color: #f39c12; }
+.sku-card.dif-neg { border-top-color: #e74c3c; }
+.sku-card.dif-zero { border-top-color: #2ecc71; }
+.sku-name { font-size: 18px; font-weight: 700; color: #1a2540; }
+.sku-num { font-size: 22px; font-weight: 700; color: #1a2540; line-height: 1.2; margin-top: 4px; font-variant-numeric: tabular-nums; }
+.sku-sub { font-size: 11px; color: #5a6378; margin-top: 2px; }
+.sku-desvio { display: inline-block; padding: 3px 8px; border-radius: 6px; font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; margin-top: 6px; }
+.sku-desvio.pos { background: #fff3cd; color: #856404; }
+.sku-desvio.neg { background: #fadbd8; color: #b03a2e; }
+.sku-desvio.ok { background: #d4f5e0; color: #1e7e3b; }
+.sku-desvio.none { background: #e9ecef; color: #5a6378; }
+.sku-comparison { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 10px; }
+.sku-mini { font-size: 11px; }
+.sku-mini-label { color: #8590a8; text-transform: uppercase; letter-spacing: .3px; font-weight: 600; }
+.sku-mini-val { font-size: 15px; font-weight: 700; color: #1a2540; font-variant-numeric: tabular-nums; }
+
+.zonas-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 14px; }
+.zona-card { background: #fff; border: 1px solid #e5e9f0; border-radius: 10px; padding: 16px; }
+.zona-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 4px; }
+.zona-title { font-size: 12px; font-weight: 700; color: #5a6378; text-transform: uppercase; letter-spacing: .5px; }
+.zona-pct { font-size: 26px; font-weight: 700; line-height: 1; }
+.zona-sub { font-size: 11px; color: #8590a8; margin-bottom: 8px; }
+.zona-bar { background: #f0f3f7; height: 8px; border-radius: 4px; overflow: hidden; margin-bottom: 10px; }
+.zona-bar-fill { height: 100%; transition: width .4s; }
+.zona-table-wrap { max-height: 240px; overflow: auto; border-top: 1px solid #eef1f6; }
+.zona-table { width: 100%; font-size: 12px; border-collapse: collapse; }
+.zona-table th { position: sticky; top: 0; background: #f5f7fa; padding: 6px 8px; text-align: left; font-size: 10px; color: #5a6378; text-transform: uppercase; border-bottom: 1px solid #e5e9f0; }
+.zona-table td { padding: 5px 8px; border-bottom: 1px solid #f0f3f7; }
+.zona-empty { font-size: 12px; color: #8590a8; padding: 14px 0; text-align: center; }
+</style>
+</head>
+<body>
+<div class="header">
+  <div class="header-left">
+    <div class="header-icon">📦</div>
+    <div>
+      <div class="header-title">Conteo Físico Stock — MLM México</div>
+      <div class="header-subtitle">Control de Inventario — Mercado Pago MX · ICQA</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <span class="exec-status" id="execStatus">Sin ejecución registrada</span>
+    <button class="btn-new" onclick="borrarCache()" title="Borra los archivos cacheados en este navegador" style="background:#5a3a3a;border-color:#7a4a4a">🗑 Borrar cache</button>
+    <button class="btn-new" onclick="resetAll(event)">← Nueva ejecución</button>
+  </div>
+</div>
+<div class="tabs">
+  <div class="tab active" data-tab="resumen">📊 Resumen General</div>
+  <div class="tab" data-tab="fisico">📋 Conteo Físico</div>
+  <div class="tab" data-tab="cruce">🔁 Cruce Sistema ↔ Físico</div>
+  <div class="tab" data-tab="hallazgos">⚠️ Hallazgos</div>
+  <div class="tab" data-tab="alcance">🎯 Alcance</div>
+  <div class="tab" data-tab="ajustes">📝 Pendientes Ajuste</div>
+  <div class="tab" data-tab="aplicados">✅ Ajustes Aplicados</div>
+  <div class="tab" data-tab="bases">🔎 Bases / Diagnóstico</div>
+</div>
+<div class="config-bar">
+  <div class="config-item"><label>Quarter:</label>
+    <select id="cfgQuarter"><option>Q1</option><option selected>Q2</option><option>Q3</option><option>Q4</option></select>
+    <select id="cfgYear"><option>2025</option><option selected>2026</option></select>
+  </div>
+  <div class="config-item"><label>Depósito:</label><input type="text" id="cfgDeposito" value="MLMMEX09 — Mexico 9" class="wide"></div>
+  <div class="config-item"><label>Fecha conteo:</label><input type="date" id="cfgFecha"></div>
+  <div class="config-item"><label>Umbral diferencia:</label><input type="number" id="cfgUmbral" value="0" min="0"><span style="color:#5a6378;font-size:12px">unidades</span></div>
+  <div class="config-meta">Umbral 0 = estricto · Cruce: SKU + Ubicación (tolerante a formato)</div>
+</div>
+<div class="upload-grid">
+  <div class="upload-card" id="card-sistema">
+    <span class="upload-icon">🗂️</span>
+    <div class="upload-title">STOCK SISTÉMICO</div>
+    <div class="upload-subtitle">LPN Cajas · CSV</div>
+    <input type="file" id="file-sistema" accept=".csv,text/csv,*/*" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0">
+    <label class="btn-load" for="file-sistema">Cargar archivo</label>
+    <div class="upload-status" id="status-sistema">Sin cargar · click o arrastrá</div>
+  </div>
+  <div class="upload-card" id="card-fisico">
+    <span class="upload-icon">📋</span>
+    <div class="upload-title">CONTEO FÍSICO</div>
+    <div class="upload-subtitle">Planilla Proveedor · XLSX</div>
+    <input type="file" id="file-fisico" accept=".xlsx,.xls,*/*" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0">
+    <label class="btn-load" for="file-fisico">Cargar archivo</label>
+    <div class="upload-status" id="status-fisico">Sin cargar · click o arrastrá</div>
+  </div>
+  <div class="upload-card" id="card-master">
+    <span class="upload-icon">🗺️</span>
+    <div class="upload-title">MASTER UBICACIONES</div>
+    <div class="upload-subtitle">Depósito completo · XLSX/CSV</div>
+    <input type="file" id="file-master" accept=".xlsx,.xls,.csv,*/*" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0">
+    <label class="btn-load" for="file-master">Cargar archivo</label>
+    <div class="upload-status" id="status-master">Sin cargar · click o arrastrá</div>
+  </div>
+</div>
+<div class="exec-bar">
+  <button class="btn-exec" id="btnExec" onclick="ejecutarControl()">▶ Ejecutar Control</button>
+  <span class="exec-msg" id="execMsg">Inicializando...</span>
+</div>
+<div class="content">
+  <div class="panel active" id="panel-resumen">
+    <div id="resumen-empty" class="empty-state"><div class="icon">📊</div><h3>Sin ejecución</h3><p>Cargá los archivos y ejecutá el control para ver el resumen.</p></div>
+    <div id="resumen-data" style="display:none">
+      <div class="kpi-grid" id="kpiGrid"></div>
+
+      <!-- OCUPACIÓN + ÁREAS -->
+      <div class="dashboard-row" id="ocupacionRow">
+        <div class="donut-card">
+          <div class="donut-title">Ocupación del Depósito</div>
+          <div class="donut-wrap" id="donutWrap"></div>
+        </div>
+        <div class="bars-card">
+          <div class="donut-title">Ocupación por Área / Pasillo</div>
+          <div id="barsArea"></div>
+        </div>
+      </div>
+
+      <!-- STOCK POR SKU -->
+      <div class="section-card">
+        <div class="section-title">Stock por SKU — Sistémico vs Físico</div>
+        <div class="section-desc">Una card por SKU con unidades sistémicas, físicas y desvío (diferencia).</div>
+        <div class="sku-grid" id="skuGrid"></div>
+      </div>
+
+      <!-- ZONAS OPERATIVAS -->
+      <div class="section-card">
+        <div class="section-title">Zonas Operativas — Detalle por Ubicación</div>
+        <div class="section-desc">Cada zona con su % de ocupación y el detalle de ubicaciones (SKU + sistémico + físico + diferencia).</div>
+        <div class="zonas-grid" id="zonasGrid"></div>
+      </div>
+
+      <div class="section-card">
+        <div class="section-title">📦 Inventario completo del depósito (vista consolidada)
+          <button class="btn-export" onclick="exportInventarioCompleto()">⬇ Exportar Excel</button>
+        </div>
+        <div class="section-desc">Una fila por ubicación · SKU · stock sistémico · stock físico · diferencia · estado del conteo. Si tenés el master cargado, incluye TODAS las ubicaciones del depósito (vacías + con stock).</div>
+        <div class="toolbar">
+          <input type="text" class="search" id="searchInv" placeholder="🔍 Buscar SKU o ubicación..." oninput="renderInventarioCompleto()">
+          <select id="filtroInv" onchange="renderInventarioCompleto()">
+            <option value="">Todas las ubicaciones</option>
+            <option value="con_dif">Con diferencia</option>
+            <option value="contadas">Solo contadas</option>
+            <option value="no_contadas">Solo no contadas</option>
+            <option value="con_stock">Con stock sistémico</option>
+            <option value="vacias">Vacías en sistema</option>
+          </select>
+          <select id="filtroOrigen" onchange="renderInventarioCompleto()">
+            <option value="">Todos los conteos</option>
+            <option value="terceros">Contado por terceros</option>
+            <option value="sistema">Solo conteo de sistema</option>
+            <option value="sin_conteo">Sin ningún conteo</option>
+          </select>
+        </div>
+        <div class="table-wrap" style="max-height:600px"><table id="tablaInvCompleto"></table></div>
+      </div>
+      <div class="section-card"><div class="section-title">Distribución de resultados por SKU</div><div id="distribucion"></div>
+        <div class="legend">
+          <span><span class="dot dot-green"></span> OK</span>
+          <span><span class="dot dot-yellow"></span> Sobrante</span>
+          <span><span class="dot dot-red"></span> Faltante</span>
+          <span><span class="dot dot-gray"></span> No contado</span>
+        </div>
+      </div>
+      <div class="section-card"><div class="section-title">Top 10 diferencias absolutas</div><div class="table-wrap" style="max-height:380px"><table id="topDiff"></table></div></div>
+    </div>
+  </div>
+  <div class="panel" id="panel-fisico">
+    <div class="section-card">
+      <div class="section-title">📋 Conteo Físico del Proveedor
+        <button class="btn-export" onclick="exportFisicoDesglose()">⬇ Exportar Excel</button>
+      </div>
+      <div class="section-desc">Desglose de lo que cargó el contador externo: ubicación, SKU, unidades contadas, observaciones.</div>
+      <div class="summary-row" id="fisico-stats"></div>
+      <div class="toolbar"><input type="text" class="search" id="searchFis" placeholder="🔍 Buscar SKU o ubicación..." oninput="renderFisicoDesglose()"></div>
+      <div class="table-wrap" style="max-height:600px"><table id="tablaFisicoDesglose"></table></div>
+    </div>
+  </div>
+  <div class="panel" id="panel-bases">
+    <div class="section-card" id="diagnostico-card" style="display:none">
+      <div class="section-title">🔎 Diagnóstico de matching</div>
+      <div class="section-desc">Verificá que las claves SKU + Ubicación del conteo físico estén en el formato del WMS.</div>
+      <div id="diagnostico-body"></div>
+    </div>
+    <div class="section-card"><div class="section-title">📂 Stock Sistémico — Agregado por SKU + Ubicación
+        <button class="btn-export" onclick="exportAgregado()">⬇ Exportar Excel</button>
+      </div>
+      <div class="section-desc">Cantidades sistémicas agregadas por posición (sin LPN). La columna "Físico" se llena al cargar el Excel del proveedor.</div>
+      <div class="summary-row" id="stat-sistema"></div>
+      <div class="toolbar"><input type="text" class="search" id="searchAgregado" placeholder="🔍 Buscar SKU o ubicación..." oninput="renderAgregado()"></div>
+      <div class="table-wrap" style="max-height:500px"><table id="tablaAgregado"></table></div>
+    </div>
+    <div class="section-card"><div class="section-title">📋 Conteo Físico — Detalle del proveedor</div>
+      <div class="section-desc">Filas tal como vienen del Excel del proveedor (sin agregar).</div>
+      <div class="summary-row" id="stat-fisico"></div>
+      <div class="table-wrap" style="max-height:400px"><table id="preview-fisico"></table></div>
+    </div>
+  </div>
+  <div class="panel" id="panel-cruce">
+    <div class="section-card">
+      <div class="section-title">Cruce Sistema ↔ Físico <button class="btn-export" onclick="exportCruce()">⬇ Exportar Excel</button></div>
+      <div class="section-desc">Una fila por par SKU + Ubicación. Diferencia = Sistema − Conteo Final.</div>
+      <div class="toolbar">
+        <input type="text" class="search" id="searchCruce" placeholder="🔍 Buscar SKU o ubicación..." oninput="renderCruce()">
+        <select id="filtroCruce" onchange="renderCruce()">
+          <option value="">Todos</option><option value="ok">Solo OK</option><option value="dif">Con diferencia</option>
+          <option value="faltante">Faltantes</option><option value="sobrante">Sobrantes</option><option value="no_contado">No contado</option>
+        </select>
+      </div>
+      <div class="table-wrap"><table id="tablaCruce"></table></div>
+    </div>
+  </div>
+  <div class="panel" id="panel-hallazgos">
+    <div class="section-card">
+      <div class="section-title">Hallazgos <button class="btn-export" onclick="exportHallazgos()">⬇ Exportar Excel</button></div>
+      <div class="toolbar"><input type="text" class="search" id="searchHallazgos" placeholder="🔍 Buscar..." oninput="renderHallazgos()"></div>
+      <div class="table-wrap"><table id="tablaHallazgos"></table></div>
+    </div>
+  </div>
+  <div class="panel" id="panel-alcance">
+    <div class="section-card"><div class="section-title">Alcance del Conteo
+        <button class="btn-export" onclick="exportAlcance()">⬇ Exportar Excel</button>
+      </div>
+      <div class="summary-row" id="alcance-stats"></div>
+      <div style="margin-top:16px"><div style="font-weight:700;margin-bottom:8px;color:#1a2540">Posiciones con stock en sistema NO contadas (cruce SKU+Ubi)</div><div class="table-wrap" style="max-height:280px"><table id="tablaNoContado"></table></div></div>
+      <div style="margin-top:16px"><div style="font-weight:700;margin-bottom:8px;color:#1a2540">Posiciones contadas que NO figuran en sistema</div><div class="table-wrap" style="max-height:280px"><table id="tablaSoloFisico"></table></div></div>
+    </div>
+    <div class="section-card" id="master-section" style="display:none"><div class="section-title">🗺️ Cobertura del Master de Ubicaciones</div>
+      <div class="section-desc">Verifica que el conteo físico haya pasado por TODAS las ubicaciones del depósito, no solo las que tienen stock.</div>
+      <div style="margin-top:8px"><div style="font-weight:700;margin-bottom:8px;color:#e74c3c">⚠ Ubicaciones del master CON stock en sistema y NO contadas físicamente</div><div class="table-wrap" style="max-height:300px"><table id="tablaMasterNoCont"></table></div></div>
+      <div style="margin-top:16px"><div style="font-weight:700;margin-bottom:8px;color:#f39c12">⚠ Ubicaciones del master vacías y NO verificadas (riesgo stock fantasma)</div><div class="table-wrap" style="max-height:300px"><table id="tablaMasterVacia"></table></div></div>
+      <div style="margin-top:16px"><div style="font-weight:700;margin-bottom:8px;color:#f39c12">⚠ Ubicaciones en sistema/físico que NO figuran en el master (posibles errores de tipeo)</div><div class="table-wrap" style="max-height:200px"><table id="tablaNoMaster"></table></div></div>
+    </div>
+  </div>
+  <div class="panel" id="panel-ajustes">
+    <div class="section-card">
+      <div class="section-title">Pendientes de Ajuste <button class="btn-export" onclick="exportAjustes()">⬇ Exportar Excel</button></div>
+      <div class="table-wrap"><table id="tablaAjustes"></table></div>
+    </div>
+  </div>
+</div>
+<div class="footer">Conteo Físico Stock MLM México · ICQA Mercado Pago · Procesamiento local en navegador</div>
+<div class="toast" id="toast"></div>
+<script>
+const state = { sistema: null, sistemaRaw: null, fisico: null, fisicoRaw: null, masterRaw: null, masterIdx: null, cruce: null, ejecucionFecha: null };
+
+// === Persistencia con IndexedDB (sobrevive recargas del tablero) ===
+const DB_NAME = 'conteoMLM_v1', DB_STORE = 'cache';
+let _dbP = null;
+function openDB() {
+  if (_dbP) return _dbP;
+  _dbP = new Promise((resolve, reject) => {
+    if (!window.indexedDB) return reject(new Error('IndexedDB no disponible'));
+    const req = indexedDB.open(DB_NAME, 1);
+    req.onupgradeneeded = e => { e.target.result.createObjectStore(DB_STORE); };
+    req.onsuccess = e => resolve(e.target.result);
+    req.onerror = e => reject(e.target.error);
+  });
+  return _dbP;
+}
+function dbSave(key, value) {
+  return openDB().then(db => new Promise((resolve, reject) => {
+    const tx = db.transaction(DB_STORE, 'readwrite');
+    tx.objectStore(DB_STORE).put(value, key);
+    tx.oncomplete = () => resolve();
+    tx.onerror = e => reject(e.target.error);
+  })).catch(e => console.warn('dbSave fail', e));
+}
+function dbLoad(key) {
+  return openDB().then(db => new Promise((resolve, reject) => {
+    const tx = db.transaction(DB_STORE, 'readonly');
+    const req = tx.objectStore(DB_STORE).get(key);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = e => reject(e.target.error);
+  })).catch(() => null);
+}
+function dbClear() {
+  return openDB().then(db => new Promise((resolve) => {
+    const tx = db.transaction(DB_STORE, 'readwrite');
+    tx.objectStore(DB_STORE).clear();
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => resolve();
+  })).catch(() => {});
+}
+
+// === GitHub Sync (persistencia compartida) ===
+// CONFIGURAR: poné tu usuario de GitHub y nombre del repo
+const GH_CONFIG = {
+  owner: 'martinacaporaligreco-lab',    // <-- CAMBIAR
+  repo:  'Conteo-MLM',           // <-- CAMBIAR si pusiste otro nombre
+  branch: 'main'
+};
+
+function ghConfigured() { return !!(GH_CONFIG.owner && GH_CONFIG.repo); }
+function ghToken() { return localStorage.getItem('gh_pat_conteo_mlm') || ''; }
+function ghSetToken(t) { localStorage.setItem('gh_pat_conteo_mlm', t || ''); }
+function ghClearToken() { localStorage.removeItem('gh_pat_conteo_mlm'); }
+
+async function ghLoad(key) {
+  if (!ghConfigured()) return null;
+  try {
+    const url = `https://raw.githubusercontent.com/${GH_CONFIG.owner}/${GH_CONFIG.repo}/${GH_CONFIG.branch}/data/${key}.json?t=${Date.now()}`;
+    const r = await fetch(url, { cache: 'no-store' });
+    if (!r.ok) return null;
+    return await r.json();
+  } catch(e) { console.warn('ghLoad fail', key, e); return null; }
+}
+
+async function ghSave(key, value) {
+  if (!ghConfigured()) return { ok: false, reason: 'no_config' };
+  let token = ghToken();
+  if (!token) {
+    token = await promptToken();
+    if (!token) return { ok: false, reason: 'no_token' };
+  }
+  try {
+    const path = `data/${key}.json`;
+    const apiUrl = `https://api.github.com/repos/${GH_CONFIG.owner}/${GH_CONFIG.repo}/contents/${path}`;
+    let sha = null;
+    try {
+      const r = await fetch(apiUrl + `?ref=${GH_CONFIG.branch}`, { headers: { Authorization: `token ${token}` } });
+      if (r.ok) { const j = await r.json(); sha = j.sha; }
+      else if (r.status === 401) {
+        ghClearToken();
+        toast('Token inválido — pidió de nuevo', 'err');
+        return { ok: false, reason: 'bad_token' };
+      }
+    } catch(e) {}
+    const json = JSON.stringify(value);
+    // Tamaño máximo de la GitHub Contents API ~100MB pero recomienda <1MB
+    if (json.length > 90 * 1024 * 1024) {
+      toast(`Archivo ${key} demasiado grande (${(json.length/1024/1024).toFixed(1)}MB)`, 'err');
+      return { ok: false, reason: 'too_big' };
+    }
+    const b64 = btoa(unescape(encodeURIComponent(json)));
+    const body = {
+      message: `update ${key} — ${new Date().toLocaleString('es-MX')}`,
+      content: b64,
+      branch: GH_CONFIG.branch
+    };
+    if (sha) body.sha = sha;
+    const r2 = await fetch(apiUrl, {
+      method: 'PUT',
+      headers: { Authorization: `token ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    if (!r2.ok) {
+      const errTxt = await r2.text();
+      console.error('ghSave failed', r2.status, errTxt);
+      if (r2.status === 401) { ghClearToken(); }
+      toast(`Error GitHub ${r2.status} al guardar ${key}`, 'err');
+      return { ok: false, reason: 'http_' + r2.status };
+    }
+    return { ok: true };
+  } catch(e) { console.error('ghSave error', e); return { ok: false, reason: 'exc' }; }
+}
+
+function ghSyncStatus(state, msg) {
+  const el = document.getElementById('gh-sync-status');
+  if (!el) return;
+  el.classList.remove('ok','err','saving');
+  if (state) el.classList.add(state);
+  if (state === 'saving') el.textContent = '⏳ Subiendo a GitHub...';
+  else if (state === 'ok') el.textContent = '✓ Sincronizado · ' + (msg||'');
+  else if (state === 'err') el.textContent = '✗ ' + (msg || 'Error al sincronizar');
+  else el.textContent = msg || '';
+}
+
+// Envoltura del dbSave original para también pushear a GitHub
+const _origDbSave_GH = dbSave;
+dbSave = async function(key, value) {
+  await _origDbSave_GH(key, value);
+  if (!ghConfigured()) return;
+  ghSyncStatus('saving');
+  const res = await ghSave(key, value);
+  if (res.ok) ghSyncStatus('ok', key);
+  else if (res.reason !== 'no_token') ghSyncStatus('err', res.reason);
+};
+
+// Modal token
+function promptToken() {
+  return new Promise(resolve => {
+    const modal = document.getElementById('gh-token-modal');
+    if (!modal) return resolve('');
+    const input = document.getElementById('gh-token-input');
+    const btnSave = document.getElementById('gh-token-save');
+    const btnCancel = document.getElementById('gh-token-cancel');
+    input.value = '';
+    modal.style.display = 'flex';
+    const cleanup = () => { modal.style.display = 'none'; btnSave.onclick = null; btnCancel.onclick = null; };
+    btnSave.onclick = () => { const v = input.value.trim(); if (v) ghSetToken(v); cleanup(); resolve(v); };
+    btnCancel.onclick = () => { cleanup(); resolve(''); };
+  });
+}
+
+
+function $(id) { return document.getElementById(id); }
+function toast(msg, type) { const t = $('toast'); t.textContent = msg; t.className = 'toast show ' + (type || ''); setTimeout(()=>t.className='toast '+(type||''), 4000); }
+function fmt(n) { if (n === null || n === undefined || isNaN(n)) return '—'; return Number(n).toLocaleString('es-MX'); }
+function fmtPct(n) { if (n === null || n === undefined || isNaN(n)) return '—'; return (n * 100).toFixed(2) + '%'; }
+function normKey(s) { if (s == null) return ''; return String(s).trim().toUpperCase(); }
+function normKeyStrong(s) { if (s == null) return ''; return String(s).trim().toUpperCase().replace(/[\s\-\.\/\\,_]+/g, ''); }
+document.querySelectorAll('.tab').forEach(t => { t.addEventListener('click', () => { document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active')); document.querySelectorAll('.panel').forEach(x=>x.classList.remove('active')); t.classList.add('active'); $('panel-' + t.dataset.tab).classList.add('active'); }); });
+
+function procesarCSV(f) {
+  $('status-sistema').textContent = '[1] iniciando...';
+  if (!f) { $('status-sistema').textContent = '[FAIL] no se recibió archivo'; return; }
+  $('status-sistema').textContent = '[2] ' + f.name + ' (' + (f.size/1024).toFixed(0) + ' KB)';
+  if (typeof Papa === 'undefined') { $('status-sistema').textContent = '[FAIL] PapaParse no cargó'; toast('PapaParse no disponible', 'err'); return; }
+  $('status-sistema').textContent = '[3] parseando CSV...';
+  try {
+    Papa.parse(f, {
+      header: true, skipEmptyLines: true,
+      transformHeader: h => h.replace(/^﻿/, '').trim(),
+      complete: function(results) {
+        state.sistemaRaw = results.data;
+        state.agregadoCache = null;
+        dbSave('sistemaRaw', results.data);
+        $('card-sistema').classList.remove('error'); $('card-sistema').classList.add('loaded');
+        $('status-sistema').textContent = '✓ ' + results.data.length.toLocaleString('es-MX') + ' filas (cacheado)';
+        checkReady(); renderBases(); toast('Stock cargado: ' + results.data.length.toLocaleString('es-MX') + ' filas', 'ok');
+      },
+      error: function(err) { $('card-sistema').classList.add('error'); $('status-sistema').textContent = '[FAIL] ' + err.message; toast('Error CSV: ' + err.message, 'err'); }
+    });
+  } catch (e) { $('card-sistema').classList.add('error'); $('status-sistema').textContent = '[FAIL] ' + e.message; toast(e.message, 'err'); }
+}
+
+function procesarXLSX(f) {
+  $('status-fisico').textContent = '[1] iniciando...';
+  if (!f) { $('status-fisico').textContent = '[FAIL] no se recibió archivo'; return; }
+  $('status-fisico').textContent = '[2] ' + f.name + ' (' + (f.size/1024).toFixed(0) + ' KB)';
+  if (typeof XLSX === 'undefined') { $('status-fisico').textContent = '[FAIL] XLSX no cargó'; toast('SheetJS no disponible', 'err'); return; }
+  $('status-fisico').textContent = '[3] leyendo bytes...';
+  const reader = new FileReader();
+  reader.onerror = () => { $('card-fisico').classList.add('error'); $('status-fisico').textContent = '[FAIL] FileReader error'; toast('No se pudo leer', 'err'); };
+  reader.onload = ev => {
+    $('status-fisico').textContent = '[4] parseando XLSX...';
+    try {
+      const wb = XLSX.read(ev.target.result, { type: 'array' });
+      const sheetName = wb.SheetNames.find(n => n.toLowerCase().includes('inventario')) || wb.SheetNames[0];
+      const ws = wb.Sheets[sheetName];
+      const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, defval: '' });
+      let headerRow = -1;
+      for (let i = 0; i < Math.min(10, aoa.length); i++) {
+        const row = aoa[i].map(c => normKey(c));
+        if (row.some(c => c.includes('SKU') || c.includes('CÓDIGO') || c.includes('CODIGO'))) { headerRow = i; break; }
+      }
+      if (headerRow < 0) headerRow = 3;
+      const headers = aoa[headerRow].map(h => String(h || '').trim());
+      const rows = [];
+      for (let i = headerRow + 1; i < aoa.length; i++) {
+        const r = aoa[i];
+        if (!r || r.every(c => c === '' || c === null || c === undefined)) continue;
+        const obj = {};
+        headers.forEach((h, idx) => { obj[h] = r[idx]; });
+        rows.push(obj);
+      }
+      state.fisicoRaw = rows;
+      dbSave('fisicoRaw', rows);
+      $('card-fisico').classList.remove('error'); $('card-fisico').classList.add('loaded');
+      $('status-fisico').textContent = '✓ ' + rows.length.toLocaleString('es-MX') + ' filas (cacheado)';
+      checkReady(); renderBases(); toast('Físico cargado: ' + rows.length.toLocaleString('es-MX') + ' filas', 'ok');
+    } catch (err) {
+      $('card-fisico').classList.add('error'); $('status-fisico').textContent = '[FAIL] ' + err.message; toast('Error Excel: ' + err.message, 'err');
+    }
+  };
+  reader.readAsArrayBuffer(f);
+}
+
+function procesarMaster(f) {
+  $('status-master').textContent = '[1] iniciando...';
+  if (!f) { $('status-master').textContent = '[FAIL] no se recibió archivo'; return; }
+  $('status-master').textContent = '[2] ' + f.name + ' (' + (f.size/1024).toFixed(0) + ' KB)';
+  const isCSV = /\.csv$/i.test(f.name);
+  if (isCSV) {
+    if (typeof Papa === 'undefined') { $('status-master').textContent = '[FAIL] PapaParse no cargó'; return; }
+    Papa.parse(f, {
+      header: true, skipEmptyLines: true,
+      transformHeader: h => h.replace(/^﻿/, '').trim(),
+      complete: function(results) { finalizarMaster(results.data); },
+      error: function(err) { $('card-master').classList.add('error'); $('status-master').textContent = '[FAIL] ' + err.message; }
+    });
+  } else {
+    if (typeof XLSX === 'undefined') { $('status-master').textContent = '[FAIL] XLSX no cargó'; return; }
+    const reader = new FileReader();
+    reader.onerror = () => { $('card-master').classList.add('error'); $('status-master').textContent = '[FAIL] FileReader error'; };
+    reader.onload = ev => {
+      try {
+        const wb = XLSX.read(ev.target.result, { type: 'array' });
+        // Probar todas las hojas, leer como AOA (array of arrays) y detectar el header dinámicamente
+        let mejor = null;
+        for (const sn of wb.SheetNames) {
+          const ws = wb.Sheets[sn];
+          const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, defval: '' });
+          if (!aoa.length) continue;
+          // Buscar fila de header dentro de las primeras 10 filas
+          let headerRow = -1;
+          for (let i = 0; i < Math.min(15, aoa.length); i++) {
+            const row = (aoa[i] || []).map(c => normKey(c));
+            if (row.some(c => /CODIGO\s*UBICACION|UBICACI[OÓ]N/.test(c))) { headerRow = i; break; }
+          }
+          if (headerRow < 0) {
+            // fallback: usar fila 0 si tiene >= 3 columnas con texto
+            const r0 = (aoa[0] || []).filter(c => c && String(c).trim());
+            if (r0.length >= 3) headerRow = 0;
+          }
+          if (headerRow < 0) continue;
+          const headers = (aoa[headerRow] || []).map(h => String(h || '').trim());
+          const dataRows = [];
+          for (let i = headerRow + 1; i < aoa.length; i++) {
+            const r = aoa[i] || [];
+            if (!r || r.every(c => c === '' || c == null)) continue;
+            const obj = {};
+            headers.forEach((h, idx) => { obj[h] = r[idx]; });
+            dataRows.push(obj);
+          }
+          if (!mejor || dataRows.length > mejor.rows.length) mejor = { sheet: sn, rows: dataRows, headers, headerRow };
+        }
+        if (!mejor) throw new Error('No se detectó header con "CODIGO UBICACION"');
+        $('status-master').textContent = '[3] hoja "' + mejor.sheet + '" · header fila ' + (mejor.headerRow + 1) + ' · ' + mejor.rows.length + ' filas';
+        finalizarMaster(mejor.rows);
+      } catch (err) { $('card-master').classList.add('error'); $('status-master').textContent = '[FAIL] ' + err.message; toast(err.message, 'err'); }
+    };
+    reader.readAsArrayBuffer(f);
+  }
+}
+function finalizarMaster(rows) {
+  state.masterRaw = rows;
+  if (!rows.length) { $('status-master').textContent = '[FAIL] sin filas'; toast('Master sin filas', 'err'); return; }
+  // Recopilar TODAS las claves que aparecen en cualquier fila (no solo el primero, por si la primera fila está vacía)
+  const allKeys = new Set();
+  rows.slice(0, 50).forEach(r => Object.keys(r).forEach(k => allKeys.add(k)));
+  const keysArr = Array.from(allKeys);
+  // Buscar columna ubicación con prioridad
+  const candidatos = [
+    /^codigo\s*ubicacion$/i, /^c[óo]digo\s*ubicaci[óo]n$/i,
+    /^ubicaci[óo]n$/i, /^ubicacion$/i,
+    /ubicaci[óo]n/i, /ubicacion/i,
+    /^codigo$/i, /^c[óo]digo$/i
+  ];
+  let colUbi = null;
+  for (const re of candidatos) {
+    colUbi = keysArr.find(k => re.test(String(k).trim()));
+    if (colUbi) break;
+  }
+  // Si no se detecta, probar buscando una columna donde la mayoría de valores tengan formato de ubicación (XX-NN-NN-...)
+  if (!colUbi) {
+    for (const k of keysArr) {
+      const muestra = rows.slice(0, 100).map(r => String(r[k] || '')).filter(v => v);
+      if (muestra.length < 10) continue;
+      const matchUbi = muestra.filter(v => /^[A-Z]{1,3}-?\d/.test(v.trim().toUpperCase())).length;
+      if (matchUbi / muestra.length > 0.6) { colUbi = k; break; }
+    }
+  }
+  if (!colUbi) {
+    $('status-master').textContent = '[FAIL] columna ubicación no detectada. Cols: ' + keysArr.slice(0,5).join(', ');
+    toast('No se detectó la columna de ubicación. Columnas vistas: ' + keysArr.slice(0,8).join(' | '), 'err');
+    return;
+  }
+  state.masterIdx = {};
+  rows.forEach(r => {
+    const ubi = normKey(r[colUbi]);
+    if (!ubi) return;
+    state.masterIdx[ubi] = {
+      ubicacion: ubi,
+      tipo: r['TIPO DE UBICACION'] || r['Tipo de Ubicación'] || r['Tipo'] || '',
+      zona: r['ZONA ALMACENAMIENTO'] || r['Zona Almacenamiento'] || r['Zona'] || '',
+      area: r['AREA'] || r['Área'] || '',
+      contadaPrev: normKey(r['CONTADA'] || r['Contada'] || '')
+    };
+  });
+  const total = Object.keys(state.masterIdx).length;
+  $('card-master').classList.remove('error'); $('card-master').classList.add('loaded');
+  $('status-master').textContent = '✓ ' + total.toLocaleString('es-MX') + ' ubicaciones (cacheado)';
+  state.agregadoCache = null;
+  dbSave('masterIdx', state.masterIdx);
+  dbSave('masterRaw', rows);
+  renderBases();
+  toast('Master: ' + total.toLocaleString('es-MX') + ' ubicaciones', 'ok');
+}
+$('file-sistema').addEventListener('change', function(e) { procesarCSV(e.target.files && e.target.files[0]); });
+$('file-fisico').addEventListener('change', function(e) { procesarXLSX(e.target.files && e.target.files[0]); });
+$('file-master').addEventListener('change', function(e) { procesarMaster(e.target.files && e.target.files[0]); });
+
+function setupDrop(cardId, processor) {
+  const card = $(cardId);
+  ['dragenter', 'dragover'].forEach(ev => card.addEventListener(ev, e => { e.preventDefault(); e.stopPropagation(); card.classList.add('dragover'); }));
+  ['dragleave', 'drop'].forEach(ev => card.addEventListener(ev, e => { e.preventDefault(); e.stopPropagation(); card.classList.remove('dragover'); }));
+  card.addEventListener('drop', e => { const f = e.dataTransfer.files[0]; if (f) processor(f); });
+}
+setupDrop('card-sistema', procesarCSV);
+setupDrop('card-fisico', procesarXLSX);
+setupDrop('card-master', procesarMaster);
+window.addEventListener('error', e => { toast('Error JS: ' + (e.message || 'desconocido'), 'err'); });
+
+function checkReady() { if (state.sistemaRaw && state.fisicoRaw) { $('btnExec').classList.add('ready'); $('execMsg').textContent = 'Listo para ejecutar el cruce.'; } }
+
+function resetAll(ev) {
+  const btn = ev && ev.currentTarget;
+  if (btn && !btn.dataset.c) { const o = btn.textContent; btn.dataset.c='1'; btn.textContent='¿Confirmar?'; btn.style.background='#e74c3c'; setTimeout(()=>{btn.textContent=o;btn.style.background='';delete btn.dataset.c;}, 2500); return; }
+  if (btn) { delete btn.dataset.c; btn.style.background=''; }
+  state.sistema=null; state.sistemaRaw=null; state.fisico=null; state.fisicoRaw=null; state.masterRaw=null; state.masterIdx=null; state.cruce=null; state.cobertura=null; state.agregadoCache=null; state.invCache=null;
+  dbClear();
+  $('card-sistema').classList.remove('loaded','error'); $('card-fisico').classList.remove('loaded','error'); $('card-master').classList.remove('loaded','error');
+  $('status-sistema').textContent='Sin cargar · click o arrastrá'; $('status-fisico').textContent='Sin cargar · click o arrastrá'; $('status-master').textContent='Sin cargar · click o arrastrá';
+  $('btnExec').classList.remove('ready'); $('execStatus').textContent='Sin ejecución registrada';
+  $('execMsg').textContent='Cargá los archivos para ejecutar.';
+  $('resumen-empty').style.display=''; $('resumen-data').style.display='none';
+  $('file-sistema').value=''; $('file-fisico').value=''; $('file-master').value='';
+  const ms = $('master-section'); if (ms) ms.style.display='none';
+  toast('Ejecución reiniciada');
+}
+
+function ejecutarControl() {
+  if (!state.sistemaRaw || !state.fisicoRaw) { toast('Faltan archivos', 'err'); return; }
+  $('execMsg').textContent = 'Procesando...';
+  const sistemaAgg = {};
+  const sfc = { total: 0, usado: 0 };
+  state.sistemaRaw.forEach(r => {
+    sfc.total++; sfc.usado++;
+    const sku = normKey(r['PRODUCTO']); const ubi = normKey(r['UBICACION']);
+    if (!sku) return;
+    const key = sku + '||' + ubi;
+    if (!sistemaAgg[key]) sistemaAgg[key] = { sku, ubicacion: ubi, unidades: 0, lpns: 0, zona: r['ZONA UBI']||'', descripcion: r['DESCRIPCION UBI']||'', estados: new Set() };
+    sistemaAgg[key].unidades += parseFloat(r['UNID. TOT.']) || 0;
+    sistemaAgg[key].lpns += 1;
+    if (r['ESTADO']) sistemaAgg[key].estados.add(normKey(r['ESTADO']));
+  });
+  const fisicoAgg = {};
+  state.fisicoRaw.forEach(r => {
+    const sku = normKey(r['SKU / Código'] || r['SKU'] || r['Código'] || r['Codigo'] || r['Producto'] || r['PRODUCTO']);
+    const ubi = normKey(r['Ubicación / Posición'] || r['Ubicación'] || r['Ubicacion'] || r['UBICACION'] || r['Posición'] || r['Posicion']);
+    if (!sku) return;
+    const cleanN = v => parseFloat(String(v || '').replace(/[^\d.\-]/g, ''));
+    const cf = cleanN(r['Conteo\nFinal'] || r['Conteo Final'] || r['Final']);
+    const c1 = cleanN(r['1.ª Conteo\nfísico'] || r['1.ª Conteo físico'] || r['1° Conteo']);
+    const c2 = cleanN(r['2.ª Conteo\nfísico'] || r['2.ª Conteo físico'] || r['2° Conteo']);
+    const c3 = cleanN(r['3.ª Conteo\nfísico'] || r['3.ª Conteo físico'] || r['3° Conteo']);
+    const contadoFinal = !isNaN(cf) ? cf : (!isNaN(c3) ? c3 : (!isNaN(c2) ? c2 : (isNaN(c1) ? null : c1)));
+    const desc = r['Descripción del producto'] || r['Descripcion del producto'] || r['Descripción'] || '';
+    const obs = r['Observaciones / Causa diferencia'] || r['Observaciones'] || '';
+    const aj = normKey(r['Ajuste realizado\nen sistema (S/N)'] || r['Ajuste realizado en sistema (S/N)'] || r['Ajuste realizado'] || '');
+    const key = sku + '||' + ubi;
+    if (!fisicoAgg[key]) fisicoAgg[key] = { sku, ubicacion: ubi, contadoFinal: 0, descripcion: desc, observaciones: obs, ajustado: aj };
+    fisicoAgg[key].contadoFinal += contadoFinal || 0;
+  });
+
+  // Matching tolerante: si no matchea exacto, intentar normalización fuerte
+  const sistemaIdxStrong = {};
+  Object.keys(sistemaAgg).forEach(k => {
+    const nk = normKeyStrong(sistemaAgg[k].sku) + '||' + normKeyStrong(sistemaAgg[k].ubicacion);
+    sistemaIdxStrong[nk] = k;
+  });
+  const remappedFisico = {};
+  Object.keys(fisicoAgg).forEach(fk => {
+    if (sistemaAgg[fk]) { remappedFisico[fk] = fisicoAgg[fk]; }
+    else {
+      const fkN = normKeyStrong(fisicoAgg[fk].sku) + '||' + normKeyStrong(fisicoAgg[fk].ubicacion);
+      const sysKey = sistemaIdxStrong[fkN];
+      if (sysKey) {
+        if (!remappedFisico[sysKey]) remappedFisico[sysKey] = Object.assign({}, fisicoAgg[fk], { _matched: 'norm' });
+        else remappedFisico[sysKey].contadoFinal += fisicoAgg[fk].contadoFinal;
+      } else {
+        remappedFisico[fk] = fisicoAgg[fk];
+      }
+    }
+  });
+
+  const allKeys = new Set([...Object.keys(sistemaAgg), ...Object.keys(remappedFisico)]);
+  const umbral = parseFloat($('cfgUmbral').value) || 0;
+  const cruce = [];
+  allKeys.forEach(k => {
+    const s = sistemaAgg[k]; const f = remappedFisico[k];
+    const sku = (s && s.sku) || (f && f.sku);
+    const ubi = (s && s.ubicacion) || (f && f.ubicacion);
+    const sU = s ? s.unidades : null;
+    const cU = f ? f.contadoFinal : null;
+    let dif = null, ex = null, res = 'no_contado';
+    if (s && f) {
+      dif = (sU || 0) - (cU || 0);
+      ex = sU > 0 ? 1 - Math.abs(dif) / sU : (cU === 0 ? 1 : null);
+      if (Math.abs(dif) <= umbral) res = 'ok';
+      else if (dif > 0) res = 'faltante';
+      else res = 'sobrante';
+    } else if (!s && f) { res = 'solo_fisico'; dif = -cU; }
+    cruce.push({ sku, ubicacion: ubi, sistemaU: sU, contadoU: cU, diferencia: dif, exactitud: ex, resultado: res,
+      lpns: s ? s.lpns : 0, zona: s ? s.zona : '', descripcion: (f && f.descripcion) || (s && s.descripcion) || '',
+      estados: s ? Array.from(s.estados).join(', ') : '', observaciones: f ? f.observaciones : '', ajustado: f ? f.ajustado : '' });
+  });
+  cruce.sort((a, b) => Math.abs(b.diferencia || 0) - Math.abs(a.diferencia || 0));
+
+  state.cruce = cruce;
+  state.invCache = null;
+  state.ejecucionFecha = new Date();
+
+  // Cobertura del master de ubicaciones (si está cargado)
+  if (state.masterIdx) {
+    const ubisSistema = new Set();
+    const ubisFisico = new Set();
+    Object.values(sistemaAgg).forEach(s => { ubisSistema.add(s.ubicacion); });
+    state.fisicoRaw.forEach(r => {
+      const ubi = normKey(r['Ubicación / Posición'] || r['Ubicación'] || r['Ubicacion'] || r['UBICACION'] || r['Posición'] || r['Posicion']);
+      if (ubi) ubisFisico.add(ubi);
+    });
+    const masterUbis = Object.keys(state.masterIdx);
+    const cobertura = masterUbis.map(u => {
+      const m = state.masterIdx[u];
+      const enSistema = ubisSistema.has(u);
+      const enFisico = ubisFisico.has(u);
+      let estado;
+      if (enSistema && enFisico) estado = 'contada_con_stock';
+      else if (enSistema && !enFisico) estado = 'NO_CONTADA_CON_STOCK'; // ALERTA
+      else if (!enSistema && enFisico) estado = 'contada_vacia';
+      else estado = 'NO_VERIFICADA_VACIA'; // ALERTA menor
+      return { ubicacion: u, tipo: m.tipo, zona: m.zona, area: m.area, enSistema, enFisico, estado };
+    });
+    // Detectar ubicaciones que aparecen en sistema/físico pero NO están en master (typos/errores)
+    const noEnMaster = [];
+    ubisSistema.forEach(u => { if (!state.masterIdx[u]) noEnMaster.push({ ubicacion: u, fuente: 'sistema' }); });
+    ubisFisico.forEach(u => { if (!state.masterIdx[u] && !ubisSistema.has(u)) noEnMaster.push({ ubicacion: u, fuente: 'físico' }); });
+    state.cobertura = cobertura;
+    state.ubisNoEnMaster = noEnMaster;
+  } else {
+    state.cobertura = null;
+    state.ubisNoEnMaster = null;
+  }
+
+  // Diagnóstico de matching
+  const sistKeys = Object.keys(sistemaAgg);
+  const fisKeys = Object.keys(fisicoAgg);
+  const exact = fisKeys.filter(k => sistemaAgg[k]).length;
+  const strong = fisKeys.filter(k => !sistemaAgg[k] && sistemaIdxStrong[normKeyStrong(fisicoAgg[k].sku) + '||' + normKeyStrong(fisicoAgg[k].ubicacion)]).length;
+  state.diagnostico = {
+    fisKeysTotal: fisKeys.length, sistKeysTotal: sistKeys.length, exactMatches: exact, strongMatches: strong, noMatch: fisKeys.length - exact - strong,
+    fisSample: fisKeys.slice(0, 8).map(k => ({ sku: fisicoAgg[k].sku, ubi: fisicoAgg[k].ubicacion, contado: fisicoAgg[k].contadoFinal })),
+    sistSample: sistKeys.slice(0, 8).map(k => ({ sku: sistemaAgg[k].sku, ubi: sistemaAgg[k].ubicacion, unidades: sistemaAgg[k].unidades })),
+    fisSinMatch: fisKeys.filter(k => !sistemaAgg[k] && !sistemaIdxStrong[normKeyStrong(fisicoAgg[k].sku) + '||' + normKeyStrong(fisicoAgg[k].ubicacion)]).slice(0, 10).map(k => ({ sku: fisicoAgg[k].sku, ubi: fisicoAgg[k].ubicacion }))
+  };
+
+  renderAll();
+  $('execStatus').textContent = '✓ Ejecutado ' + state.ejecucionFecha.toLocaleString('es-MX');
+  $('execMsg').textContent = 'Ejecución completada.';
+  toast('Cruce: ' + cruce.length.toLocaleString('es-MX') + ' posiciones', 'ok');
+}
+
+function badgeRes(r) { return ({ ok:'<span class="badge badge-ok">OK</span>', faltante:'<span class="badge badge-err">FALTANTE</span>', sobrante:'<span class="badge badge-warn">SOBRANTE</span>', no_contado:'<span class="badge badge-missing">NO CONTADO</span>', solo_fisico:'<span class="badge badge-warn">SOLO FÍSICO</span>' })[r] || r; }
+
+function renderAll() { renderResumen(); renderInventarioCompleto(); renderFisicoDesglose(); renderBases(); renderCruce(); renderHallazgos(); renderAlcance(); renderAjustes(); }
+
+function buildInventarioCompleto() {
+  // Combina master + cruce → una fila por ubicación con SKU principal y stock
+  if (!state.cruce) return [];
+  const idxCruce = {};
+  state.cruce.forEach(r => {
+    if (!idxCruce[r.ubicacion]) idxCruce[r.ubicacion] = [];
+    idxCruce[r.ubicacion].push(r);
+  });
+  const out = [];
+  const visitedUbi = new Set();
+  // 1) Primero todas las ubicaciones del cruce (con stock o contadas)
+  state.cruce.forEach(r => {
+    visitedUbi.add(r.ubicacion);
+    out.push({
+      ubicacion: r.ubicacion, sku: r.sku, sistemaU: r.sistemaU, contadoU: r.contadoU,
+      diferencia: r.diferencia, resultado: r.resultado,
+      zona: r.zona || (state.masterIdx && state.masterIdx[r.ubicacion] ? state.masterIdx[r.ubicacion].zona : ''),
+      tipo: state.masterIdx && state.masterIdx[r.ubicacion] ? state.masterIdx[r.ubicacion].tipo : '',
+      contadoPor: r.contadoU !== null ? 'TERCEROS' : (state.masterIdx && state.masterIdx[r.ubicacion] && state.masterIdx[r.ubicacion].contadaPrev === 'SI' ? 'SISTEMA' : 'SIN_CONTEO')
+    });
+  });
+  // 2) Agregar ubicaciones del master que no están en cruce (vacías y no contadas)
+  if (state.masterIdx) {
+    Object.values(state.masterIdx).forEach(m => {
+      if (!visitedUbi.has(m.ubicacion)) {
+        out.push({
+          ubicacion: m.ubicacion, sku: '—', sistemaU: 0, contadoU: null,
+          diferencia: null, resultado: 'vacia_master',
+          zona: m.zona, tipo: m.tipo,
+          contadoPor: m.contadaPrev === 'SI' ? 'SISTEMA' : 'SIN_CONTEO'
+        });
+      }
+    });
+  }
+  return out;
+}
+
+function renderInventarioCompleto() {
+  if (!state.cruce) return;
+  if (!state.invCache) state.invCache = buildInventarioCompleto();
+  const q = (($('searchInv') && $('searchInv').value) || '').toUpperCase().trim();
+  const fl = ($('filtroInv') && $('filtroInv').value) || '';
+  const fo = ($('filtroOrigen') && $('filtroOrigen').value) || '';
+  let data = state.invCache;
+  if (q) data = data.filter(r => (r.sku || '').includes(q) || (r.ubicacion || '').includes(q));
+  if (fl === 'con_dif') data = data.filter(r => r.diferencia !== null && r.diferencia !== 0);
+  else if (fl === 'contadas') data = data.filter(r => r.contadoU !== null);
+  else if (fl === 'no_contadas') data = data.filter(r => r.contadoU === null);
+  else if (fl === 'con_stock') data = data.filter(r => r.sistemaU > 0);
+  else if (fl === 'vacias') data = data.filter(r => !r.sistemaU);
+  if (fo === 'terceros') data = data.filter(r => r.contadoPor === 'TERCEROS');
+  else if (fo === 'sistema') data = data.filter(r => r.contadoPor === 'SISTEMA');
+  else if (fo === 'sin_conteo') data = data.filter(r => r.contadoPor === 'SIN_CONTEO');
+  $('tablaInvCompleto').innerHTML = `<thead><tr>
+    <th>Ubicación</th><th>Zona</th><th>Tipo</th><th>SKU</th>
+    <th class="num">Sistémico</th><th class="num">Físico</th><th class="num">Diferencia</th>
+    <th>Contado por</th><th>Estado</th>
+  </tr></thead><tbody>${data.slice(0, 3000).map(r => `
+    <tr>
+      <td><strong>${r.ubicacion}</strong></td>
+      <td>${r.zona || ''}</td>
+      <td>${r.tipo || ''}</td>
+      <td><strong>${r.sku}</strong></td>
+      <td class="num">${fmt(r.sistemaU)}</td>
+      <td class="num">${r.contadoU !== null ? fmt(r.contadoU) : '<span style="color:#b0b8c5">—</span>'}</td>
+      <td class="num ${r.diferencia === null ? '' : r.diferencia > 0 ? 'diff-neg' : r.diferencia < 0 ? 'diff-pos' : 'diff-zero'}">${r.diferencia === null ? '—' : (r.diferencia > 0 ? '+' : '') + fmt(r.diferencia)}</td>
+      <td>${badgeContador(r.contadoPor)}</td>
+      <td>${r.resultado === 'vacia_master' ? '<span class="badge badge-missing">VACÍA</span>' : badgeRes(r.resultado)}</td>
+    </tr>`).join('')}</tbody>`;
+}
+
+function badgeContador(c) {
+  if (c === 'TERCEROS') return '<span class="badge" style="background:#d6e9ff;color:#1e3a5f">TERCEROS</span>';
+  if (c === 'SISTEMA') return '<span class="badge" style="background:#e9ecef;color:#5a6378">SISTEMA</span>';
+  return '<span class="badge" style="background:#fff3cd;color:#856404">SIN CONTEO</span>';
+}
+
+function exportInventarioCompleto() {
+  if (!state.invCache) state.invCache = buildInventarioCompleto();
+  const data = state.invCache.map(r => ({
+    Ubicación: r.ubicacion, Zona: r.zona, Tipo: r.tipo, SKU: r.sku,
+    'Stock Sistémico': r.sistemaU, 'Stock Físico': r.contadoU,
+    'Diferencia': r.diferencia, 'Contado por': r.contadoPor, Estado: r.resultado
+  }));
+  XLSX.writeFile(buildWB(data, 'Inventario'), 'Conteo_MLM_Inventario_' + expSuf() + '.xlsx');
+  toast('Inventario exportado: ' + data.length, 'ok');
+}
+
+function renderFisicoDesglose() {
+  if (!state.fisicoRaw) return;
+  const q = (($('searchFis') && $('searchFis').value) || '').toUpperCase().trim();
+
+  // === DIAGNÓSTICO: detectar columnas dinámicamente ===
+  const sampleRow = state.fisicoRaw[0] || {};
+  const allKeys = Object.keys(sampleRow);
+  const findCol = (regexes) => {
+    for (const re of regexes) {
+      const k = allKeys.find(key => re.test(String(key).trim()));
+      if (k) return k;
+    }
+    return null;
+  };
+  const colSKU = findCol([/^sku\s*\/\s*c[óo]digo$/i, /^sku$/i, /^c[óo]digo$/i, /^producto$/i, /sku/i, /c[óo]digo/i]);
+  const colUbi = findCol([/^ubicaci[óo]n\s*\/\s*posici[óo]n$/i, /^ubicaci[óo]n$/i, /^ubicacion$/i, /^posici[óo]n$/i, /ubicaci/i, /posici/i]);
+  const colDesc = findCol([/descripci[óo]n.*producto/i, /^descripci[óo]n$/i]);
+  const colFinal = findCol([/conteo\s*final/i, /^final$/i, /conteo.*final/i]);
+  const colC1 = findCol([/1[°ª\.].*conteo/i, /conteo.*1/i, /^1.*$/]);
+  const colC2 = findCol([/2[°ª\.].*conteo/i, /conteo.*2/i]);
+  const colC3 = findCol([/3[°ª\.].*conteo/i, /conteo.*3/i]);
+  const colObs = findCol([/observaci/i, /causa/i]);
+
+  // Mostrar diagnóstico encima de la tabla
+  let diagDiv = $('fis-diag');
+  if (!diagDiv) {
+    diagDiv = document.createElement('div');
+    diagDiv.id = 'fis-diag';
+    diagDiv.style.cssText = 'background:#f8faff;border:1px solid #d4dae3;border-radius:6px;padding:10px 14px;margin-bottom:12px;font-size:12px;color:#1a2540';
+    const tbl = $('tablaFisicoDesglose');
+    tbl.parentNode.insertBefore(diagDiv, tbl);
+  }
+  const todasOK = !!(colSKU && colUbi && colFinal);
+  diagDiv.innerHTML = `
+    <div style="font-weight:700;margin-bottom:6px">🔎 Diagnóstico de columnas detectadas <span style="color:${todasOK?'#2ecc71':'#e74c3c'}">${todasOK?'✓':'⚠'}</span></div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px">
+      <div><strong>SKU:</strong> ${colSKU || '<span style="color:#e74c3c">NO DETECTADO</span>'}</div>
+      <div><strong>Ubicación:</strong> ${colUbi || '<span style="color:#e74c3c">NO DETECTADO</span>'}</div>
+      <div><strong>Conteo Final:</strong> ${colFinal || '<span style="color:#e74c3c">NO DETECTADO</span>'}</div>
+      <div><strong>1° Conteo:</strong> ${colC1 || '—'}</div>
+      <div><strong>2° Conteo:</strong> ${colC2 || '—'}</div>
+      <div><strong>3° Conteo:</strong> ${colC3 || '—'}</div>
+      <div><strong>Observaciones:</strong> ${colObs || '—'}</div>
+      <div><strong>Descripción:</strong> ${colDesc || '—'}</div>
+    </div>
+    <div style="margin-top:8px;font-size:11px;color:#5a6378">Todas las columnas del archivo: ${allKeys.join(' · ') || '<vacío>'}</div>
+  `;
+
+  const cleanN = v => parseFloat(String(v == null ? '' : v).replace(/[^\d.\-]/g, ''));
+  const rows = state.fisicoRaw.map(r => {
+    const sku = normKey(colSKU ? r[colSKU] : '');
+    const ubi = normKey(colUbi ? r[colUbi] : '');
+    const desc = colDesc ? (r[colDesc] || '') : '';
+    const cf = colFinal ? cleanN(r[colFinal]) : NaN;
+    const c1 = colC1 ? cleanN(r[colC1]) : NaN;
+    const c2 = colC2 ? cleanN(r[colC2]) : NaN;
+    const c3 = colC3 ? cleanN(r[colC3]) : NaN;
+    const cf_final = !isNaN(cf) ? cf : (!isNaN(c3) ? c3 : (!isNaN(c2) ? c2 : (isNaN(c1) ? 0 : c1)));
+    const obs = colObs ? (r[colObs] || '') : '';
+    return { sku, ubi, desc, c1: isNaN(c1) ? null : c1, c2: isNaN(c2) ? null : c2, c3: isNaN(c3) ? null : c3, final: cf_final, obs };
+  });
+  const totUnid = rows.reduce((a, r) => a + (r.final || 0), 0);
+  const ubisUnicas = new Set(rows.map(r => r.ubi).filter(u => u)).size;
+  const skusUnicos = new Set(rows.map(r => r.sku).filter(s => s)).size;
+  const totalMaster = state.masterIdx ? Object.keys(state.masterIdx).length : null;
+  const cobertura = totalMaster ? ((ubisUnicas / totalMaster) * 100).toFixed(1) : null;
+  $('fisico-stats').innerHTML = `
+    ${totalMaster !== null ? `<div class="mini-stat"><div class="mini-stat-label">Total ubicaciones (master)</div><div class="mini-stat-value">${fmt(totalMaster)}</div></div>` : ''}
+    <div class="mini-stat"><div class="mini-stat-label">Ubicaciones contadas</div><div class="mini-stat-value">${fmt(ubisUnicas)}${totalMaster !== null ? ` <span style="font-size:11px;color:#8590a8">/ ${fmt(totalMaster)} (${cobertura}%)</span>` : ''}</div></div>
+    <div class="mini-stat"><div class="mini-stat-label">Σ Unidades contadas</div><div class="mini-stat-value">${fmt(totUnid)}</div></div>`;
+  let data = rows;
+  if (q) data = data.filter(r => r.sku.includes(q) || r.ubi.includes(q));
+  $('tablaFisicoDesglose').innerHTML = `<thead><tr>
+    <th>Ubicación</th><th>SKU</th><th>Descripción</th>
+    <th class="num">1° Conteo</th><th class="num">2° Conteo</th><th class="num">3° Conteo</th><th class="num">Final</th>
+    <th>Observaciones</th>
+  </tr></thead><tbody>${data.slice(0, 3000).map(r => `
+    <tr>
+      <td><strong>${r.ubi || '<vacío>'}</strong></td>
+      <td><strong>${r.sku || '<vacío>'}</strong></td>
+      <td>${r.desc}</td>
+      <td class="num">${r.c1 !== null ? fmt(r.c1) : '—'}</td>
+      <td class="num">${r.c2 !== null ? fmt(r.c2) : '—'}</td>
+      <td class="num">${r.c3 !== null ? fmt(r.c3) : '—'}</td>
+      <td class="num"><strong>${fmt(r.final)}</strong></td>
+      <td>${r.obs}</td>
+    </tr>`).join('')}</tbody>`;
+}
+
+function exportFisicoDesglose() {
+  if (!state.fisicoRaw) { toast('Cargá el físico primero', 'err'); return; }
+  const data = state.fisicoRaw.map(r => {
+    const sku = normKey(r['SKU / Código'] || r['SKU'] || r['Código'] || r['Codigo'] || r['Producto'] || r['PRODUCTO']);
+    const ubi = normKey(r['Ubicación / Posición'] || r['Ubicación'] || r['Ubicacion'] || r['UBICACION'] || r['Posición'] || r['Posicion']);
+    const cleanN = v => parseFloat(String(v || '').replace(/[^\d.\-]/g, ''));
+    const cf = cleanN(r['Conteo\nFinal'] || r['Conteo Final'] || r['Final']);
+    const c1 = cleanN(r['1.ª Conteo\nfísico'] || r['1.ª Conteo físico']);
+    const c2 = cleanN(r['2.ª Conteo\nfísico'] || r['2.ª Conteo físico']);
+    const c3 = cleanN(r['3.ª Conteo\nfísico'] || r['3.ª Conteo físico']);
+    return {
+      Ubicación: ubi, SKU: sku,
+      Descripción: r['Descripción del producto'] || r['Descripción'] || '',
+      '1° Conteo': isNaN(c1) ? null : c1,
+      '2° Conteo': isNaN(c2) ? null : c2,
+      '3° Conteo': isNaN(c3) ? null : c3,
+      'Conteo Final': !isNaN(cf) ? cf : (!isNaN(c3) ? c3 : (!isNaN(c2) ? c2 : (isNaN(c1) ? null : c1))),
+      Observaciones: r['Observaciones / Causa diferencia'] || r['Observaciones'] || '',
+      'Contado por': 'TERCEROS / Proveedor externo'
+    };
+  });
+  XLSX.writeFile(buildWB(data, 'Conteo Fisico'), 'Conteo_MLM_Fisico_' + expSuf() + '.xlsx');
+  toast('Físico exportado: ' + data.length + ' filas', 'ok');
+}
+
+// === Helper: extraer el "área" del código de ubicación (prefijo antes del primer guion) ===
+function ubiArea(u) {
+  if (!u) return '—';
+  const m = String(u).match(/^([A-Z]+(?:-?\d+)?)-/);
+  return m ? m[1] : String(u).split('-')[0] || '—';
+}
+// === Helper: extraer la "calle" (pasillo) — segundo segmento numérico ===
+function ubiCalle(u) {
+  if (!u) return '—';
+  const parts = String(u).split('-');
+  if (parts.length >= 2) return parts[0] + '-' + parts[1];
+  return parts[0] || '—';
+}
+// === Helper: clasificar zona del master según TIPO o ZONA ===
+function clasificarZona(masterRow, fallbackUbi) {
+  if (masterRow) {
+    const t = (masterRow.tipo || '').toUpperCase();
+    const z = (masterRow.zona || '').toUpperCase();
+    if (t === 'RESERVA') return 'RESERVA';
+    if (t === 'PUERTA') return 'PUERTA';
+    if (t === 'DROP') return 'DROP';
+    if (t === 'STAGING') return 'STAGING';
+    if (z.includes('PICKING')) return 'PICKING';
+    if (z.includes('GENERAL')) return 'RESERVA';
+    if (t) return t;
+  }
+  // Inferir por prefijo de la ubicación
+  const area = ubiArea(fallbackUbi);
+  if (area.startsWith('PK')) return 'PICKING';
+  if (area.startsWith('JA') || area.startsWith('RK')) return 'RESERVA';
+  if (area.startsWith('DK')) return 'PUERTA';
+  if (area.startsWith('DV')) return 'RESERVA';
+  if (area.startsWith('BUF')) return 'BUFFER';
+  if (area.startsWith('MI')) return 'MAQUILA';
+  return 'OTRA';
+}
+
+function renderOcupacion() {
+  if (!state.sistemaRaw || !state.masterIdx) return;
+  // Set de ubicaciones únicas con stock UBICADO o ASIGNADO (del CSV LPN Cajas)
+  const ESTADOS_OCUPADO = new Set(['UBICADO', 'ASIGNADO']);
+  const ubisOcupadas = new Set();
+  state.sistemaRaw.forEach(r => {
+    const estado = String(r['ESTADO'] || '').trim().toUpperCase();
+    if (!ESTADOS_OCUPADO.has(estado)) return;
+    const ubi = normKey(r['UBICACION']);
+    if (!ubi) return;
+    if (state.masterIdx[ubi]) ubisOcupadas.add(ubi);
+  });
+
+  const totalDep = Object.keys(state.masterIdx).length;
+  const ocupadas = ubisOcupadas.size;
+  const libres = Math.max(0, totalDep - ocupadas);
+  const pct = totalDep > 0 ? (ocupadas / totalDep * 100) : 0;
+  const color = pct >= 70 ? '#e74c3c' : pct >= 40 ? '#f39c12' : '#2ecc71';
+  const r = 50, c0 = 2 * Math.PI * r, dash = Math.min(pct, 100) / 100 * c0;
+  $('donutWrap').innerHTML = `
+    <svg class="donut-svg" viewBox="0 0 130 130">
+      <circle cx="65" cy="65" r="${r}" fill="none" stroke="#eef1f6" stroke-width="12"/>
+      <circle cx="65" cy="65" r="${r}" fill="none" stroke="${color}" stroke-width="12" stroke-linecap="round" stroke-dasharray="${dash} ${c0}" transform="rotate(-90 65 65)"/>
+      <text x="65" y="68" text-anchor="middle" font-size="22" font-weight="700" fill="${color}" font-family="-apple-system,sans-serif">${pct.toFixed(1)}%</text>
+    </svg>
+    <div class="donut-stats">
+      <div><strong>${fmt(ocupadas)}</strong> ocupadas</div>
+      <div><strong style="color:#2ecc71">${fmt(libres)}</strong> libres</div>
+      <div><strong>${fmt(totalDep)}</strong> totales (master)</div>
+    </div>`;
+
+  // Barras por área: master = total · sistema UBICADO = ocupadas
+  const totalPorArea = {};
+  Object.values(state.masterIdx).forEach(m => {
+    const a = ubiArea(m.ubicacion);
+    totalPorArea[a] = (totalPorArea[a] || 0) + 1;
+  });
+  const ocupPorArea = {};
+  ubisOcupadas.forEach(u => {
+    const a = ubiArea(u);
+    ocupPorArea[a] = (ocupPorArea[a] || 0) + 1;
+  });
+  const areasList = Object.keys(totalPorArea).sort();
+  $('barsArea').innerHTML = areasList.map(a => {
+    const oc = ocupPorArea[a] || 0;
+    const tot = totalPorArea[a];
+    const p = tot > 0 ? Math.min(100, oc / tot * 100) : 0;
+    const cl = p >= 70 ? '#e74c3c' : p >= 40 ? '#f39c12' : '#2ecc71';
+    return `
+      <div class="bar-row">
+        <div><div class="bar-label">${a}</div><div class="bar-detail">${fmt(oc)} ocup · ${fmt(tot - oc)} libres</div></div>
+        <div class="bar-pct" style="color:${cl}">${p.toFixed(1)}%</div>
+        <div class="bar-track"><div class="bar-fill" style="background:${cl};width:${p.toFixed(1)}%"></div></div>
+      </div>`;
+  }).join('');
+}
+
+function renderStockPorSKU() {
+  if (!state.cruce) return;
+  // Agrupar por SKU
+  const skus = {};
+  state.cruce.forEach(r => {
+    if (!r.sku) return;
+    if (!skus[r.sku]) skus[r.sku] = { sku: r.sku, sistemico: 0, fisico: 0, conFisico: false, ubicaciones: 0 };
+    skus[r.sku].sistemico += r.sistemaU || 0;
+    if (r.contadoU !== null) { skus[r.sku].fisico += r.contadoU || 0; skus[r.sku].conFisico = true; }
+    if (r.sistemaU > 0 || (r.contadoU != null && r.contadoU > 0)) skus[r.sku].ubicaciones++;
+  });
+  const list = Object.values(skus).sort((a, b) => b.sistemico - a.sistemico);
+  $('skuGrid').innerHTML = list.map(s => {
+    const dif = s.conFisico ? (s.sistemico - s.fisico) : null;
+    const cls = dif === null ? 'none' : dif === 0 ? 'ok' : dif > 0 ? 'neg' : 'pos';
+    const cardCls = dif === null ? '' : dif === 0 ? 'dif-zero' : dif > 0 ? 'dif-neg' : 'dif-pos';
+    const desvioTxt = dif === null ? 'Sin físico' : (dif > 0 ? '+' : '') + fmt(dif);
+    return `
+      <div class="sku-card ${cardCls}">
+        <div class="sku-name">${s.sku}</div>
+        <div class="sku-sub">${s.ubicaciones} ubicación${s.ubicaciones === 1 ? '' : 'es'}</div>
+        <div class="sku-comparison">
+          <div class="sku-mini">
+            <div class="sku-mini-label">Sistémico</div>
+            <div class="sku-mini-val">${fmt(s.sistemico)}</div>
+          </div>
+          <div class="sku-mini">
+            <div class="sku-mini-label">Físico</div>
+            <div class="sku-mini-val">${s.conFisico ? fmt(s.fisico) : '—'}</div>
+          </div>
+        </div>
+        <div class="sku-desvio ${cls}">DESVÍO ${desvioTxt}</div>
+      </div>`;
+  }).join('');
+}
+
+function renderZonasOperativas() {
+  if (!state.cruce) return;
+  // Set de ubicaciones UBICADO o ASIGNADO del CSV (válidas contra el master)
+  const ESTADOS_OK = new Set(['UBICADO', 'ASIGNADO']);
+  const ubisUbicadas = new Set();
+  if (state.sistemaRaw && state.masterIdx) {
+    state.sistemaRaw.forEach(r => {
+      const estado = String(r['ESTADO'] || '').trim().toUpperCase();
+      if (!ESTADOS_OK.has(estado)) return;
+      const u = normKey(r['UBICACION']);
+      if (u && state.masterIdx[u]) ubisUbicadas.add(u);
+    });
+  }
+  // Agrupar por zona: posOcupadas = ubicaciones únicas UBICADO; items = filas del cruce
+  const zonas = {};
+  // Indexar items del cruce por ubicación
+  state.cruce.forEach(r => {
+    const m = state.masterIdx && state.masterIdx[r.ubicacion];
+    const z = clasificarZona(m, r.ubicacion);
+    if (!zonas[z]) zonas[z] = { nombre: z, ubisOcupadas: new Set(), items: [], posTotales: 0 };
+    if (r.sistemaU > 0 || (r.contadoU != null && r.contadoU > 0)) {
+      zonas[z].items.push(r);
+    }
+  });
+  // Contar ubicaciones únicas ubicadas por zona
+  ubisUbicadas.forEach(u => {
+    const m = state.masterIdx[u];
+    const z = clasificarZona(m, u);
+    if (!zonas[z]) zonas[z] = { nombre: z, ubisOcupadas: new Set(), items: [], posTotales: 0 };
+    zonas[z].ubisOcupadas.add(u);
+  });
+  // Totales por zona desde el master
+  if (state.masterIdx) {
+    Object.values(state.masterIdx).forEach(m => {
+      const z = clasificarZona(m, m.ubicacion);
+      if (!zonas[z]) zonas[z] = { nombre: z, ubisOcupadas: new Set(), items: [], posTotales: 0 };
+      zonas[z].posTotales += 1;
+    });
+  }
+  Object.values(zonas).forEach(z => { z.posOcupadas = z.ubisOcupadas.size; });
+  const list = Object.values(zonas).sort((a, b) => (b.posOcupadas || 0) - (a.posOcupadas || 0));
+  $('zonasGrid').innerHTML = list.map(z => {
+    const tot = z.posTotales || z.posOcupadas;
+    const pct = tot > 0 ? (z.posOcupadas / tot * 100) : 0;
+    const cl = pct >= 70 ? '#e74c3c' : pct >= 40 ? '#f39c12' : '#2ecc71';
+    z.items.sort((a, b) => (b.sistemaU || 0) - (a.sistemaU || 0));
+    const rowsHtml = z.items.slice(0, 100).map(r => {
+      const dif = (r.sistemaU !== null && r.contadoU !== null) ? (r.sistemaU - r.contadoU) : null;
+      const difClass = dif === null ? '' : dif > 0 ? 'diff-neg' : dif < 0 ? 'diff-pos' : 'diff-zero';
+      return `<tr><td>${r.ubicacion}</td><td><strong>${r.sku}</strong></td><td class="num">${fmt(r.sistemaU)}</td><td class="num">${r.contadoU !== null ? fmt(r.contadoU) : '—'}</td><td class="num ${difClass}">${dif === null ? '—' : (dif > 0 ? '+' : '') + fmt(dif)}</td></tr>`;
+    }).join('');
+    const tabla = z.items.length === 0
+      ? `<div class="zona-empty">Sin stock</div>`
+      : `<div class="zona-table-wrap"><table class="zona-table"><thead><tr><th>Ubicación</th><th>SKU</th><th class="num">Sist.</th><th class="num">Fís.</th><th class="num">Δ</th></tr></thead><tbody>${rowsHtml}</tbody></table></div>`;
+    return `
+      <div class="zona-card">
+        <div class="zona-head">
+          <div class="zona-title">${z.nombre}</div>
+          <div class="zona-pct" style="color:${cl}">${pct.toFixed(0)}%</div>
+        </div>
+        <div class="zona-sub">${z.posOcupadas} / ${tot} posiciones${z.items.length > 100 ? ' · mostrando primeras 100' : ''}</div>
+        <div class="zona-bar"><div class="zona-bar-fill" style="background:${cl};width:${pct.toFixed(1)}%"></div></div>
+        ${tabla}
+      </div>`;
+  }).join('');
+}
+
+function renderResumen() {
+  const c = state.cruce; if (!c) return;
+  $('resumen-empty').style.display = 'none'; $('resumen-data').style.display = '';
+  renderOcupacion();
+  renderStockPorSKU();
+  renderZonasOperativas();
+  const s = { total: c.length, ok: c.filter(x=>x.resultado==='ok').length, falt: c.filter(x=>x.resultado==='faltante').length, sob: c.filter(x=>x.resultado==='sobrante').length, nc: c.filter(x=>x.resultado==='no_contado').length, sf: c.filter(x=>x.resultado==='solo_fisico').length };
+  const cz = c.filter(x => x.sistemaU !== null && x.contadoU !== null);
+  const sumSc = cz.reduce((a,x)=>a+(x.sistemaU||0),0);
+  const sumCc = cz.reduce((a,x)=>a+(x.contadoU||0),0);
+  const sumSt = c.reduce((a,x)=>a+(x.sistemaU||0),0);
+  const sumCt = c.reduce((a,x)=>a+(x.contadoU||0),0);
+  const sumDA = cz.reduce((a,x)=>a+Math.abs(x.diferencia||0),0);
+  const exg = sumSc > 0 ? 1 - sumDA/sumSc : null;
+  const cob = s.total > 0 ? (s.total - s.nc) / s.total : 0;
+  const hall = s.falt + s.sob;
+  let masterKpi = '';
+  if (state.cobertura) {
+    const cobMaster = ((state.cobertura.filter(x=>x.enFisico).length / state.cobertura.length) * 100).toFixed(1);
+    const ncStock = state.cobertura.filter(x=>x.estado==='NO_CONTADA_CON_STOCK').length;
+    masterKpi = `<div class="kpi-card ${ncStock>0?'danger':'success'}"><div class="kpi-label">Cobertura Master</div><div class="kpi-value">${cobMaster}%</div><div class="kpi-sub">${ncStock} con stock sin contar</div></div>`;
+  }
+  $('kpiGrid').innerHTML = `
+    <div class="kpi-card"><div class="kpi-label">Posiciones</div><div class="kpi-value">${fmt(s.total)}</div><div class="kpi-sub">SKU × Ubicación</div></div>
+    <div class="kpi-card success"><div class="kpi-label">OK</div><div class="kpi-value">${fmt(s.ok)}</div><div class="kpi-sub">${s.total?(s.ok/s.total*100).toFixed(1):0}%</div></div>
+    <div class="kpi-card danger"><div class="kpi-label">Hallazgos</div><div class="kpi-value">${fmt(hall)}</div><div class="kpi-sub">${s.falt} falt · ${s.sob} sobr</div></div>
+    <div class="kpi-card warning"><div class="kpi-label">No contado</div><div class="kpi-value">${fmt(s.nc)}</div><div class="kpi-sub">sin conteo</div></div>
+    <div class="kpi-card"><div class="kpi-label">Exactitud</div><div class="kpi-value">${exg!==null?fmtPct(exg):'—'}</div><div class="kpi-sub">1−|Δ|/Sistema</div></div>
+    <div class="kpi-card"><div class="kpi-label">Cobertura SKU+Ubi</div><div class="kpi-value">${fmtPct(cob)}</div><div class="kpi-sub">${fmt(s.total-s.nc)}/${fmt(s.total)}</div></div>
+    ${masterKpi}
+    <div class="kpi-card"><div class="kpi-label">Σ Unid. sistema</div><div class="kpi-value">${fmt(sumSt)}</div><div class="kpi-sub">cruzadas: ${fmt(sumSc)}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Σ Unid. contadas</div><div class="kpi-value">${fmt(sumCt)}</div><div class="kpi-sub">Δ: ${fmt(sumSc-sumCc)}</div></div>`;
+  const mx = Math.max(s.ok, s.falt, s.sob, s.nc, s.sf, 1);
+  $('distribucion').innerHTML = '<div style="display:grid;grid-template-columns:200px 1fr 80px;gap:8px;align-items:center;font-size:13px">' +
+    [['OK','dot-green',s.ok,'#2ecc71'],['Faltante','dot-red',s.falt,'#e74c3c'],['Sobrante','dot-yellow',s.sob,'#f39c12'],['No contado','dot-gray',s.nc,'#b0b8c5'],['Solo físico','dot-gray',s.sf,'#8590a8']]
+    .map(([l,d,v,col])=>`<div><span class="dot ${d}"></span> ${l}</div><div style="background:#f0f3f7;height:22px;border-radius:4px;overflow:hidden"><div style="background:${col};height:100%;width:${(v/mx*100).toFixed(1)}%"></div></div><div class="num" style="font-weight:600">${fmt(v)}</div>`).join('') + '</div>';
+  const top = c.filter(x => x.diferencia !== null && x.diferencia !== 0).slice(0, 10);
+  $('topDiff').innerHTML = `<thead><tr><th>#</th><th>SKU</th><th>Ubicación</th><th class="num">Sistema</th><th class="num">Contado</th><th class="num">Diferencia</th><th>Resultado</th></tr></thead><tbody>${top.map((r,i)=>`<tr><td>${i+1}</td><td><strong>${r.sku}</strong></td><td>${r.ubicacion||'—'}</td><td class="num">${fmt(r.sistemaU)}</td><td class="num">${fmt(r.contadoU)}</td><td class="num ${r.diferencia>0?'diff-neg':'diff-pos'}">${r.diferencia>0?'+':''}${fmt(r.diferencia)}</td><td>${badgeRes(r.resultado)}</td></tr>`).join('')}</tbody>`;
+}
+
+function renderBases() {
+  if (!state.sistemaRaw) return;
+  if (state.diagnostico) {
+    const d = state.diagnostico;
+    const pct = d.fisKeysTotal > 0 ? ((d.exactMatches + d.strongMatches) / d.fisKeysTotal * 100).toFixed(1) : 0;
+    const col = pct >= 80 ? '#2ecc71' : pct >= 30 ? '#f39c12' : '#e74c3c';
+    let al = '';
+    if (d.noMatch > 0) al = `<div class="diag-banner">⚠️ <strong>${d.noMatch}</strong> de ${d.fisKeysTotal} filas del físico no encontraron posición en sistema. Revisá formato SKU/Ubicación.</div>`;
+    $('diagnostico-card').style.display = '';
+    $('diagnostico-body').innerHTML = `
+      <div class="summary-row">
+        <div class="mini-stat"><div class="mini-stat-label">Filas físico</div><div class="mini-stat-value">${fmt(d.fisKeysTotal)}</div></div>
+        <div class="mini-stat"><div class="mini-stat-label">Pos. sistema</div><div class="mini-stat-value">${fmt(d.sistKeysTotal)}</div></div>
+        <div class="mini-stat"><div class="mini-stat-label">Match exacto</div><div class="mini-stat-value" style="color:#2ecc71">${fmt(d.exactMatches)}</div></div>
+        <div class="mini-stat"><div class="mini-stat-label">Match normalizado</div><div class="mini-stat-value" style="color:#4a90e2">${fmt(d.strongMatches)}</div></div>
+        <div class="mini-stat"><div class="mini-stat-label">Sin match</div><div class="mini-stat-value" style="color:${col}">${fmt(d.noMatch)} (${pct}% OK)</div></div>
+      </div>${al}
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px">
+        <div><div style="font-size:12px;font-weight:600;color:#5a6378;margin-bottom:6px">📋 CONTEO FÍSICO (muestra)</div><div class="table-wrap" style="max-height:240px"><table><thead><tr><th>SKU</th><th>Ubicación</th><th class="num">Contado</th></tr></thead><tbody>${d.fisSample.map(x=>`<tr><td><strong>${x.sku||'<vacío>'}</strong></td><td>${x.ubi||'<vacío>'}</td><td class="num">${fmt(x.contado)}</td></tr>`).join('')}</tbody></table></div></div>
+        <div><div style="font-size:12px;font-weight:600;color:#5a6378;margin-bottom:6px">🗂️ SISTEMA WMS (muestra)</div><div class="table-wrap" style="max-height:240px"><table><thead><tr><th>SKU</th><th>Ubicación</th><th class="num">Unidades</th></tr></thead><tbody>${d.sistSample.map(x=>`<tr><td><strong>${x.sku}</strong></td><td>${x.ubi}</td><td class="num">${fmt(x.unidades)}</td></tr>`).join('')}</tbody></table></div></div>
+      </div>
+      ${d.fisSinMatch.length > 0 ? `<div style="margin-top:14px"><div style="font-size:12px;font-weight:600;color:#e74c3c;margin-bottom:6px">❌ Sin match (primeras 10)</div><div class="table-wrap" style="max-height:240px"><table><thead><tr><th>SKU físico</th><th>Ubicación física</th></tr></thead><tbody>${d.fisSinMatch.map(x=>`<tr><td><strong>${x.sku||'<vacío>'}</strong></td><td>${x.ubi||'<vacío>'}</td></tr>`).join('')}</tbody></table></div></div>` : ''}`;
+  }
+  const skusU = new Set(state.sistemaRaw.map(r=>normKey(r['PRODUCTO']))).size;
+  const ubisU = new Set(state.sistemaRaw.map(r=>normKey(r['UBICACION']))).size;
+  const sumU = state.sistemaRaw.reduce((s,r)=>s+(parseFloat(r['UNID. TOT.'])||0),0);
+  $('stat-sistema').innerHTML = `
+    <div class="mini-stat"><div class="mini-stat-label">Total LPNs</div><div class="mini-stat-value">${fmt(state.sistemaRaw.length)}</div></div>
+    <div class="mini-stat"><div class="mini-stat-label">SKUs únicos</div><div class="mini-stat-value">${fmt(skusU)}</div></div>
+    <div class="mini-stat"><div class="mini-stat-label">Ubicaciones</div><div class="mini-stat-value">${fmt(ubisU)}</div></div>
+    <div class="mini-stat"><div class="mini-stat-label">Σ Unidades</div><div class="mini-stat-value">${fmt(sumU)}</div></div>`;
+  // Construir vista agregada (493 posiciones) — se calcula incluso sin ejecutar control
+  if (!state.agregadoCache) {
+    const agg = {};
+    state.sistemaRaw.forEach(r => {
+      const sku = normKey(r['PRODUCTO']); const ubi = normKey(r['UBICACION']);
+      if (!sku) return;
+      const key = sku + '||' + ubi;
+      if (!agg[key]) agg[key] = { sku, ubicacion: ubi, sistemaU: 0, lpns: 0, zona: r['ZONA UBI']||'' };
+      agg[key].sistemaU += parseFloat(r['UNID. TOT.']) || 0;
+      agg[key].lpns += 1;
+    });
+    state.agregadoCache = Object.values(agg).sort((a,b)=>b.sistemaU-a.sistemaU);
+  }
+  renderAgregado();
+  if (state.fisicoRaw) {
+    const skusF = new Set(state.fisicoRaw.map(r=>normKey(r['SKU / Código']||r['SKU']||r['Código']))).size;
+    const ubisF = new Set(state.fisicoRaw.map(r=>normKey(r['Ubicación / Posición']||r['Ubicación']))).size;
+    $('stat-fisico').innerHTML = `
+      <div class="mini-stat"><div class="mini-stat-label">Filas</div><div class="mini-stat-value">${fmt(state.fisicoRaw.length)}</div></div>
+      <div class="mini-stat"><div class="mini-stat-label">SKUs</div><div class="mini-stat-value">${fmt(skusF)}</div></div>
+      <div class="mini-stat"><div class="mini-stat-label">Ubicaciones</div><div class="mini-stat-value">${fmt(ubisF)}</div></div>`;
+    const cols = Object.keys(state.fisicoRaw[0]||{}).filter(k=>k&&!k.startsWith('__'));
+    renderPreviewTable('preview-fisico', state.fisicoRaw, cols.slice(0,10), 50);
+  }
+}
+
+function renderAgregado() {
+  if (!state.agregadoCache) return;
+  const q = (($('searchAgregado') && $('searchAgregado').value) || '').toUpperCase().trim();
+  // Construir índice de físico por SKU+UBI con matching tolerante (igual que ejecutarControl)
+  const fisAgg = {};
+  if (state.fisicoRaw) {
+    state.fisicoRaw.forEach(r => {
+      const sku = normKey(r['SKU / Código'] || r['SKU'] || r['Código'] || r['Codigo'] || r['Producto'] || r['PRODUCTO']);
+      const ubi = normKey(r['Ubicación / Posición'] || r['Ubicación'] || r['Ubicacion'] || r['UBICACION'] || r['Posición'] || r['Posicion']);
+      if (!sku) return;
+      const cleanN = v => parseFloat(String(v||'').replace(/[^\d.\-]/g,''));
+      const cf = cleanN(r['Conteo\nFinal'] || r['Conteo Final'] || r['Final']);
+      const c1 = cleanN(r['1.ª Conteo\nfísico'] || r['1.ª Conteo físico'] || r['1° Conteo']);
+      const c2 = cleanN(r['2.ª Conteo\nfísico'] || r['2.ª Conteo físico'] || r['2° Conteo']);
+      const c3 = cleanN(r['3.ª Conteo\nfísico'] || r['3.ª Conteo físico'] || r['3° Conteo']);
+      const v = !isNaN(cf) ? cf : (!isNaN(c3) ? c3 : (!isNaN(c2) ? c2 : (isNaN(c1) ? 0 : c1)));
+      const k = sku + '||' + ubi;
+      fisAgg[k] = (fisAgg[k] || 0) + v;
+      const kStrong = normKeyStrong(sku) + '||' + normKeyStrong(ubi);
+      fisAgg['__STRONG__' + kStrong] = (fisAgg['__STRONG__' + kStrong] || 0) + v;
+    });
+  }
+  let data = state.agregadoCache;
+  if (q) data = data.filter(r => r.sku.includes(q) || r.ubicacion.includes(q));
+  const hayFisico = !!state.fisicoRaw;
+  $('tablaAgregado').innerHTML = `<thead><tr>
+      <th>SKU</th><th>Ubicación</th><th>Zona</th>
+      <th class="num">LPNs</th>
+      <th class="num">Sistema</th>
+      ${hayFisico ? '<th class="num">Físico</th><th class="num">Diferencia</th>' : '<th class="num">Físico (cargar Excel)</th>'}
+    </tr></thead><tbody>${data.slice(0, 2000).map(r => {
+      let fis = null;
+      if (hayFisico) {
+        const k = r.sku + '||' + r.ubicacion;
+        const kStrong = '__STRONG__' + normKeyStrong(r.sku) + '||' + normKeyStrong(r.ubicacion);
+        fis = (fisAgg[k] != null ? fisAgg[k] : (fisAgg[kStrong] != null ? fisAgg[kStrong] : null));
+      }
+      const dif = (hayFisico && fis !== null) ? (r.sistemaU - fis) : null;
+      return `<tr>
+        <td><strong>${r.sku}</strong></td>
+        <td>${r.ubicacion}</td>
+        <td>${r.zona}</td>
+        <td class="num">${fmt(r.lpns)}</td>
+        <td class="num">${fmt(r.sistemaU)}</td>
+        ${hayFisico ? `<td class="num">${fis !== null ? fmt(fis) : '<span style="color:#b0b8c5">—</span>'}</td>
+        <td class="num ${dif === null ? '' : dif > 0 ? 'diff-neg' : dif < 0 ? 'diff-pos' : 'diff-zero'}">${dif === null ? '—' : (dif > 0 ? '+' : '') + fmt(dif)}</td>` : `<td class="num" style="color:#b0b8c5">—</td>`}
+      </tr>`;
+    }).join('')}</tbody>`;
+}
+
+function exportAgregado() {
+  if (!state.agregadoCache) { toast('Cargá el sistema primero', 'err'); return; }
+  const fisAgg = {};
+  if (state.fisicoRaw) {
+    state.fisicoRaw.forEach(r => {
+      const sku = normKey(r['SKU / Código'] || r['SKU'] || r['Código'] || r['Codigo'] || r['Producto'] || r['PRODUCTO']);
+      const ubi = normKey(r['Ubicación / Posición'] || r['Ubicación'] || r['Ubicacion'] || r['UBICACION'] || r['Posición'] || r['Posicion']);
+      if (!sku) return;
+      const cleanN = v => parseFloat(String(v||'').replace(/[^\d.\-]/g,''));
+      const cf = cleanN(r['Conteo\nFinal'] || r['Conteo Final'] || r['Final']);
+      const c1 = cleanN(r['1.ª Conteo\nfísico'] || r['1.ª Conteo físico'] || r['1° Conteo']);
+      const c2 = cleanN(r['2.ª Conteo\nfísico'] || r['2.ª Conteo físico'] || r['2° Conteo']);
+      const c3 = cleanN(r['3.ª Conteo\nfísico'] || r['3.ª Conteo físico'] || r['3° Conteo']);
+      const v = !isNaN(cf) ? cf : (!isNaN(c3) ? c3 : (!isNaN(c2) ? c2 : (isNaN(c1) ? 0 : c1)));
+      fisAgg[sku + '||' + ubi] = (fisAgg[sku + '||' + ubi] || 0) + v;
+      fisAgg['__S__' + normKeyStrong(sku) + '||' + normKeyStrong(ubi)] = (fisAgg['__S__' + normKeyStrong(sku) + '||' + normKeyStrong(ubi)] || 0) + v;
+    });
+  }
+  const data = state.agregadoCache.map(r => {
+    let fis = null;
+    if (state.fisicoRaw) {
+      const k = r.sku + '||' + r.ubicacion;
+      const kS = '__S__' + normKeyStrong(r.sku) + '||' + normKeyStrong(r.ubicacion);
+      fis = fisAgg[k] != null ? fisAgg[k] : (fisAgg[kS] != null ? fisAgg[kS] : null);
+    }
+    return { SKU: r.sku, Ubicación: r.ubicacion, Zona: r.zona, LPNs: r.lpns, 'Cant. Sistémica': r.sistemaU, 'Cant. Física': fis, Diferencia: fis !== null ? r.sistemaU - fis : null };
+  });
+  XLSX.writeFile(buildWB(data, 'Agregado'), 'Conteo_MLM_Agregado_' + expSuf() + '.xlsx');
+  toast('Exportado: ' + data.length + ' posiciones', 'ok');
+}
+
+function renderPreviewTable(id, data, cols, lim) {
+  const h = '<thead><tr>' + cols.map(c=>`<th>${c.replace(/\n/g,' ')}</th>`).join('') + '</tr></thead>';
+  const b = '<tbody>' + data.slice(0,lim).map(r=>'<tr>'+cols.map(c=>`<td>${r[c]==null?'':String(r[c]).replace(/\n/g,' ')}</td>`).join('')+'</tr>').join('') + '</tbody>';
+  $(id).innerHTML = h + b;
+}
+
+function renderCruce() {
+  if (!state.cruce) return;
+  const q = ($('searchCruce').value||'').toUpperCase().trim();
+  const fl = $('filtroCruce').value;
+  let d = state.cruce;
+  if (q) d = d.filter(r=>(r.sku||'').includes(q)||(r.ubicacion||'').includes(q)||(r.descripcion||'').toUpperCase().includes(q));
+  if (fl) { if (fl==='dif') d = d.filter(r=>r.resultado!=='ok'&&r.resultado!=='no_contado'); else d = d.filter(r=>r.resultado===fl); }
+  $('tablaCruce').innerHTML = `<thead><tr><th>SKU</th><th>Ubicación</th><th>Zona</th><th class="num">LPNs</th><th class="num">Sistema</th><th class="num">Contado</th><th class="num">Diferencia</th><th class="num">Exactitud</th><th>Resultado</th><th>Observaciones</th></tr></thead><tbody>${d.slice(0,2000).map(r=>`<tr><td><strong>${r.sku||''}</strong></td><td>${r.ubicacion||''}</td><td>${r.zona||''}</td><td class="num">${fmt(r.lpns)}</td><td class="num">${r.sistemaU!==null?fmt(r.sistemaU):'—'}</td><td class="num">${r.contadoU!==null?fmt(r.contadoU):'—'}</td><td class="num ${r.diferencia>0?'diff-neg':r.diferencia<0?'diff-pos':'diff-zero'}">${r.diferencia===null?'—':(r.diferencia>0?'+':'')+fmt(r.diferencia)}</td><td class="num">${r.exactitud!==null?fmtPct(r.exactitud):'—'}</td><td>${badgeRes(r.resultado)}</td><td>${r.observaciones||''}</td></tr>`).join('')}</tbody>`;
+}
+
+function renderHallazgos() {
+  if (!state.cruce) return;
+  const q = ($('searchHallazgos').value||'').toUpperCase().trim();
+  let d = state.cruce.filter(r=>r.resultado==='faltante'||r.resultado==='sobrante'||r.resultado==='solo_fisico');
+  if (q) d = d.filter(r=>(r.sku||'').includes(q)||(r.ubicacion||'').includes(q));
+  $('tablaHallazgos').innerHTML = `<thead><tr><th>#</th><th>SKU</th><th>Descripción</th><th>Ubicación</th><th class="num">Sistema</th><th class="num">Contado</th><th class="num">Diferencia</th><th class="num">Exactitud</th><th>Resultado</th><th>Obs</th></tr></thead><tbody>${d.map((r,i)=>`<tr><td>${i+1}</td><td><strong>${r.sku||''}</strong></td><td>${r.descripcion||''}</td><td>${r.ubicacion||''}</td><td class="num">${r.sistemaU!==null?fmt(r.sistemaU):'—'}</td><td class="num">${r.contadoU!==null?fmt(r.contadoU):'—'}</td><td class="num ${r.diferencia>0?'diff-neg':'diff-pos'}">${(r.diferencia>0?'+':'')+fmt(r.diferencia)}</td><td class="num">${r.exactitud!==null?fmtPct(r.exactitud):'—'}</td><td>${badgeRes(r.resultado)}</td><td>${r.observaciones||''}</td></tr>`).join('')}</tbody>`;
+}
+
+function renderAlcance() {
+  if (!state.cruce) return;
+  const nc = state.cruce.filter(r=>r.resultado==='no_contado');
+  const sf = state.cruce.filter(r=>r.resultado==='solo_fisico');
+  const ct = state.cruce.filter(r=>r.contadoU!==null);
+  const sNC = nc.reduce((a,r)=>a+(r.sistemaU||0),0);
+
+  // Cobertura del master
+  let masterStats = '';
+  if (state.cobertura) {
+    const tot = state.cobertura.length;
+    const contConStock = state.cobertura.filter(x=>x.estado==='contada_con_stock').length;
+    const ncConStock = state.cobertura.filter(x=>x.estado==='NO_CONTADA_CON_STOCK').length;
+    const contVacia = state.cobertura.filter(x=>x.estado==='contada_vacia').length;
+    const nvVacia = state.cobertura.filter(x=>x.estado==='NO_VERIFICADA_VACIA').length;
+    const cob = ((contConStock + contVacia) / tot * 100).toFixed(1);
+    masterStats = `
+      <div class="mini-stat" style="border-left:3px solid #1e3a5f"><div class="mini-stat-label">Master total</div><div class="mini-stat-value">${fmt(tot)}</div></div>
+      <div class="mini-stat" style="border-left:3px solid #2ecc71"><div class="mini-stat-label">Cobertura</div><div class="mini-stat-value">${cob}%</div></div>
+      <div class="mini-stat" style="border-left:3px solid #e74c3c"><div class="mini-stat-label">⚠ Con stock no contadas</div><div class="mini-stat-value" style="color:#e74c3c">${fmt(ncConStock)}</div></div>
+      <div class="mini-stat" style="border-left:3px solid #f39c12"><div class="mini-stat-label">⚠ Vacías no verificadas</div><div class="mini-stat-value" style="color:#f39c12">${fmt(nvVacia)}</div></div>`;
+  }
+
+  $('alcance-stats').innerHTML = `
+    <div class="mini-stat"><div class="mini-stat-label">Pos. cruzadas</div><div class="mini-stat-value">${fmt(state.cruce.length)}</div></div>
+    <div class="mini-stat"><div class="mini-stat-label">Contadas</div><div class="mini-stat-value">${fmt(ct.length)}</div></div>
+    <div class="mini-stat"><div class="mini-stat-label">Unid. sin contar</div><div class="mini-stat-value">${fmt(sNC)}</div></div>
+    ${masterStats}`;
+
+  // Tabla "no contado" del cruce SKU+Ubi (existente)
+  $('tablaNoContado').innerHTML = `<thead><tr><th>SKU</th><th>Ubicación</th><th>Zona</th><th class="num">LPNs</th><th class="num">Unidades</th></tr></thead><tbody>${nc.slice(0,500).map(r=>`<tr><td><strong>${r.sku}</strong></td><td>${r.ubicacion}</td><td>${r.zona}</td><td class="num">${fmt(r.lpns)}</td><td class="num">${fmt(r.sistemaU)}</td></tr>`).join('')}</tbody>`;
+  $('tablaSoloFisico').innerHTML = `<thead><tr><th>SKU</th><th>Ubicación</th><th class="num">Contado</th><th>Obs</th></tr></thead><tbody>${sf.map(r=>`<tr><td><strong>${r.sku}</strong></td><td>${r.ubicacion}</td><td class="num">${fmt(r.contadoU)}</td><td>${r.observaciones||''}</td></tr>`).join('')}</tbody>`;
+
+  // Tablas master (si está cargado)
+  if (state.cobertura) {
+    const ncConStock = state.cobertura.filter(x=>x.estado==='NO_CONTADA_CON_STOCK');
+    const nvVacia = state.cobertura.filter(x=>x.estado==='NO_VERIFICADA_VACIA');
+    const noMaster = state.ubisNoEnMaster || [];
+    $('master-section').style.display = '';
+    $('tablaMasterNoCont').innerHTML = `<thead><tr><th>Ubicación</th><th>Tipo</th><th>Zona</th><th>Área</th></tr></thead><tbody>${ncConStock.slice(0,500).map(r=>`<tr><td><strong style="color:#e74c3c">${r.ubicacion}</strong></td><td>${r.tipo}</td><td>${r.zona}</td><td>${r.area}</td></tr>`).join('')}</tbody>`;
+    $('tablaMasterVacia').innerHTML = `<thead><tr><th>Ubicación</th><th>Tipo</th><th>Zona</th><th>Área</th></tr></thead><tbody>${nvVacia.slice(0,500).map(r=>`<tr><td><strong>${r.ubicacion}</strong></td><td>${r.tipo}</td><td>${r.zona}</td><td>${r.area}</td></tr>`).join('')}</tbody>`;
+    $('tablaNoMaster').innerHTML = `<thead><tr><th>Ubicación</th><th>Fuente</th></tr></thead><tbody>${noMaster.slice(0,200).map(r=>`<tr><td><strong style="color:#f39c12">${r.ubicacion}</strong></td><td>${r.fuente}</td></tr>`).join('')}</tbody>`;
+  }
+}
+
+function renderAjustes() {
+  if (!state.cruce) return;
+  const a = state.cruce.filter(r=>(r.resultado==='faltante'||r.resultado==='sobrante'||r.resultado==='solo_fisico')&&r.ajustado!=='S'&&r.ajustado!=='SI');
+  $('tablaAjustes').innerHTML = `<thead><tr><th>SKU</th><th>Descripción</th><th>Ubicación</th><th class="num">Sistema</th><th class="num">Contado</th><th class="num">Diferencia</th><th>Acción</th><th>Obs</th></tr></thead><tbody>${a.map(r=>{const ac=r.resultado==='faltante'?'Ajuste negativo':r.resultado==='sobrante'?'Ajuste positivo':'Investigar';return `<tr><td><strong>${r.sku}</strong></td><td>${r.descripcion||''}</td><td>${r.ubicacion||''}</td><td class="num">${fmt(r.sistemaU)}</td><td class="num">${fmt(r.contadoU)}</td><td class="num ${r.diferencia>0?'diff-neg':'diff-pos'}">${(r.diferencia>0?'+':'')+fmt(r.diferencia)}</td><td>${ac}</td><td>${r.observaciones||''}</td></tr>`;}).join('')}</tbody>`;
+}
+
+function buildWB(data, sn) { const wb = XLSX.utils.book_new(); const ws = XLSX.utils.json_to_sheet(data); XLSX.utils.book_append_sheet(wb, ws, sn); return wb; }
+function expSuf() { return $('cfgQuarter').value + '_' + $('cfgYear').value + '_' + new Date().toISOString().slice(0,10); }
+function exportCruce() {
+  if (!state.cruce) { toast('Ejecutá primero','err'); return; }
+  const d = state.cruce.map(r=>({SKU:r.sku,Descripción:r.descripcion,Ubicación:r.ubicacion,Zona:r.zona,LPNs:r.lpns,Estados:r.estados,'Unid. Sistema':r.sistemaU,'Unid. Contadas':r.contadoU,Diferencia:r.diferencia,Exactitud:r.exactitud,Resultado:r.resultado,Observaciones:r.observaciones,Ajustado:r.ajustado}));
+  XLSX.writeFile(buildWB(d,'Cruce'), 'Conteo_MLM_Cruce_'+expSuf()+'.xlsx');
+  toast('Cruce exportado: '+d.length+' filas','ok');
+}
+function exportHallazgos() {
+  if (!state.cruce) { toast('Ejecutá primero','err'); return; }
+  const d = state.cruce.filter(r=>r.resultado==='faltante'||r.resultado==='sobrante'||r.resultado==='solo_fisico').map(r=>({SKU:r.sku,Descripción:r.descripcion,Ubicación:r.ubicacion,'Unid. Sistema':r.sistemaU,'Unid. Contadas':r.contadoU,Diferencia:r.diferencia,Exactitud:r.exactitud,Tipo:r.resultado,Observaciones:r.observaciones}));
+  if (!d.length) { toast('Sin hallazgos','err'); return; }
+  XLSX.writeFile(buildWB(d,'Hallazgos'), 'Conteo_MLM_Hallazgos_'+expSuf()+'.xlsx');
+  toast('Hallazgos: '+d.length,'ok');
+}
+function exportAlcance() {
+  if (!state.cruce) { toast('Ejecutá primero', 'err'); return; }
+  const wb = XLSX.utils.book_new();
+  if (state.cobertura) {
+    const masterData = state.cobertura.map(r => ({ Ubicación: r.ubicacion, Tipo: r.tipo, Zona: r.zona, Área: r.area, 'En Sistema': r.enSistema ? 'SI' : 'NO', 'En Físico': r.enFisico ? 'SI' : 'NO', Estado: r.estado }));
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(masterData), 'Master Cobertura');
+    const ncStock = state.cobertura.filter(x => x.estado === 'NO_CONTADA_CON_STOCK').map(r => ({ Ubicación: r.ubicacion, Tipo: r.tipo, Zona: r.zona, Área: r.area }));
+    if (ncStock.length) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(ncStock), 'Con Stock NO Contadas');
+    const nvVacia = state.cobertura.filter(x => x.estado === 'NO_VERIFICADA_VACIA').map(r => ({ Ubicación: r.ubicacion, Tipo: r.tipo, Zona: r.zona, Área: r.area }));
+    if (nvVacia.length) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(nvVacia), 'Vacías No Verificadas');
+    if (state.ubisNoEnMaster && state.ubisNoEnMaster.length) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(state.ubisNoEnMaster.map(r => ({ Ubicación: r.ubicacion, Fuente: r.fuente }))), 'No en Master');
+  }
+  const nc = state.cruce.filter(r => r.resultado === 'no_contado').map(r => ({ SKU: r.sku, Ubicación: r.ubicacion, Zona: r.zona, LPNs: r.lpns, 'Unid. Sistema': r.sistemaU }));
+  if (nc.length) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(nc), 'No Contado (con stock)');
+  XLSX.writeFile(wb, 'Conteo_MLM_Alcance_' + expSuf() + '.xlsx');
+  toast('Alcance exportado', 'ok');
+}
+
+function exportAjustes() {
+  if (!state.cruce) { toast('Ejecutá primero','err'); return; }
+  const d = state.cruce.filter(r=>(r.resultado==='faltante'||r.resultado==='sobrante'||r.resultado==='solo_fisico')&&r.ajustado!=='S'&&r.ajustado!=='SI').map(r=>({SKU:r.sku,Descripción:r.descripcion,Ubicación:r.ubicacion,'Unid. Sistema':r.sistemaU,'Unid. Contadas':r.contadoU,Diferencia:r.diferencia,Tipo:r.resultado,'Acción':r.resultado==='faltante'?'Ajuste negativo':r.resultado==='sobrante'?'Ajuste positivo':'Investigar',Observaciones:r.observaciones}));
+  if (!d.length) { toast('Sin pendientes','err'); return; }
+  XLSX.writeFile(buildWB(d,'Pendientes'), 'Conteo_MLM_PendientesAjuste_'+expSuf()+'.xlsx');
+  toast('Pendientes: '+d.length,'ok');
+}
+
+// Init
+try { $('cfgFecha').valueAsDate = new Date(); } catch(e) {}
+(function libCheck() {
+  const ok = { papa: typeof Papa !== 'undefined', xlsx: typeof XLSX !== 'undefined' };
+  const msg = (ok.papa && ok.xlsx) ? '✓ Tablero listo · cargá los archivos' : '⚠ FALTAN LIBRERÍAS — Papa:' + ok.papa + ' XLSX:' + ok.xlsx;
+  $('execMsg').textContent = msg;
+  if (!ok.papa || !ok.xlsx) toast(msg, 'err');
+})();
+
+// Restaurar archivos cacheados de IndexedDB al cargar
+async function restoreCache() {
+  try {
+    let sis=null, fis=null, mas=null, masRaw=null;
+    // 1) intentar desde GitHub (compartido)
+    if (ghConfigured()) {
+      try {
+        [sis, fis, mas, masRaw] = await Promise.all([
+          ghLoad('sistemaRaw'), ghLoad('fisicoRaw'), ghLoad('masterIdx'), ghLoad('masterRaw')
+        ]);
+        if (sis || fis || mas) ghSyncStatus('ok','datos cargados desde GitHub');
+      } catch(e) { console.warn('ghLoad failed', e); }
+    }
+    // 2) fallback IndexedDB local
+    if (!sis) sis = await dbLoad('sistemaRaw');
+    if (!fis) fis = await dbLoad('fisicoRaw');
+    if (!mas) mas = await dbLoad('masterIdx');
+    if (!masRaw) masRaw = await dbLoad('masterRaw');
+
+    if (sis && sis.length) {
+      state.sistemaRaw = sis;
+      document.getElementById('card-sistema').classList.add('loaded');
+      document.getElementById('status-sistema').textContent = '✓ ' + sis.length.toLocaleString('es-MX') + ' filas (compartido)';
+    }
+    if (fis && fis.length) {
+      state.fisicoRaw = fis;
+      document.getElementById('card-fisico').classList.add('loaded');
+      document.getElementById('status-fisico').textContent = '✓ ' + fis.length.toLocaleString('es-MX') + ' filas (compartido)';
+    }
+    if (mas && Object.keys(mas).length) {
+      state.masterIdx = mas;
+      state.masterRaw = masRaw || [];
+      document.getElementById('card-master').classList.add('loaded');
+      document.getElementById('status-master').textContent = '✓ ' + Object.keys(mas).length.toLocaleString('es-MX') + ' ubicaciones (compartido)';
+    }
+    if (sis || fis || mas) {
+      checkReady();
+      try { renderBases(); } catch(e) {}
+      toast('Datos restaurados — listo para ejecutar', 'ok');
+    }
+  } catch (e) { console.warn('No se pudo restaurar', e); }
+}
+restoreCache();
+
+// Botón para borrar cache (lo agrego al botón "Nueva ejecución" como acción secundaria)
+async function borrarCache() {
+  await dbClear();
+  toast('Cache borrado · recargá la página', 'ok');
+}
+</script>
+
+<div id="gh-token-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9999;align-items:center;justify-content:center;font-family:system-ui,sans-serif">
+  <div style="background:#fff;padding:24px;border-radius:12px;max-width:480px;width:90%;box-shadow:0 10px 40px rgba(0,0,0,0.2)">
+    <h3 style="margin:0 0 8px;color:#1a1a1a">🔑 Token de GitHub</h3>
+    <p style="margin:0 0 12px;color:#555;font-size:14px">Necesitás un Personal Access Token para que los archivos que cargues se vean desde otros navegadores. Lo guardamos solo en tu computadora — se pide una sola vez.</p>
+    <p style="margin:0 0 12px;font-size:13px"><a href="https://github.com/settings/tokens/new?scopes=repo&description=Conteo%20MLM" target="_blank" rel="noopener" style="color:#0366d6">→ Generar token nuevo (scope: repo)</a></p>
+    <input id="gh-token-input" type="password" placeholder="ghp_xxxxxxxxxxxxxxxxxxxxxxxx" style="width:100%;padding:10px;border:1px solid #ccc;border-radius:6px;font-family:monospace;font-size:13px;box-sizing:border-box"/>
+    <div style="margin-top:14px;display:flex;gap:8px;justify-content:flex-end">
+      <button id="gh-token-cancel" style="padding:8px 14px;border:1px solid #ccc;background:#fff;border-radius:6px;cursor:pointer">Cancelar</button>
+      <button id="gh-token-save" style="padding:8px 14px;border:none;background:#2da44e;color:#fff;border-radius:6px;cursor:pointer;font-weight:600">Guardar</button>
+    </div>
+  </div>
+</div>
+<div id="gh-sync-status" style="position:fixed;bottom:14px;right:14px;padding:8px 14px;border-radius:20px;font-size:12px;font-family:system-ui,sans-serif;background:rgba(0,0,0,0.78);color:#fff;z-index:9998;transition:all .3s"></div>
+<style>
+  #gh-sync-status.ok { background:#1f883d }
+  #gh-sync-status.err { background:#cf222e }
+  #gh-sync-status.saving { background:#bf8700 }
+  #gh-sync-status:empty { display:none }
+</style>
+
+</body>
+</html>
