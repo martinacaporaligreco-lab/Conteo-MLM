@@ -75,6 +75,10 @@ td { padding: 9px 12px; border-bottom: 1px solid #eef1f6; color: #1a2540; }
 tbody tr:hover { background: #f8faff; }
 .num { text-align: right; font-variant-numeric: tabular-nums; font-family: ui-monospace, monospace; }
 .num.sist { text-align: center; }
+::-webkit-scrollbar-button { display: none; }
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-thumb { background: #cdd5e0; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #a8b1c1; }
 .diff-neg { color: #e74c3c; font-weight: 600; }
 .diff-pos { color: #f39c12; font-weight: 600; }
 .diff-zero { color: #2ecc71; }
@@ -219,17 +223,7 @@ tbody tr:hover { background: #f8faff; }
     <div id="resumen-data" style="display:none">
       <div class="kpi-grid" id="kpiGrid"></div>
 
-      <!-- OCUPACIÓN + ÁREAS -->
-      <div class="dashboard-row" id="ocupacionRow">
-        <div class="donut-card">
-          <div class="donut-title">Ocupación del Depósito</div>
-          <div class="donut-wrap" id="donutWrap"></div>
-        </div>
-        <div class="bars-card">
-          <div class="donut-title">Ocupación por Área / Pasillo</div>
-          <div id="barsArea"></div>
-        </div>
-      </div>
+      <!-- OCUPACIÓN sección removida -->
 
       <!-- STOCK POR SKU -->
       <div class="section-card">
@@ -941,8 +935,8 @@ function renderInventarioCompleto() {
   else if (fo === 'sin_conteo') data = data.filter(r => r.contadoPor === 'SIN_CONTEO');
   $('tablaInvCompleto').innerHTML = `<thead><tr>
     <th>Ubicación</th><th>Zona</th><th>Tipo</th><th>SKU</th>
-    <th class="num">Sistémico</th><th class="num">Físico</th><th class="num">Diferencia</th>
-    <th>Contado por</th><th>Estado</th>
+    <th class="num sist">Sistémico</th><th class="num sist">Físico</th><th class="num sist">Diferencia</th>
+    <th>Estado</th>
   </tr></thead><tbody>${data.slice(0, 3000).map(r => `
     <tr>
       <td><strong>${r.ubicacion}</strong></td>
@@ -950,9 +944,8 @@ function renderInventarioCompleto() {
       <td>${r.tipo || ''}</td>
       <td><strong>${r.sku}</strong></td>
       <td class="num sist">${fmt(r.sistemaU)}</td>
-      <td class="num">${r.contadoU !== null ? fmt(r.contadoU) : '<span style="color:#b0b8c5">—</span>'}</td>
-      <td class="num ${r.diferencia === null ? '' : r.diferencia > 0 ? 'diff-neg' : r.diferencia < 0 ? 'diff-pos' : 'diff-zero'}">${r.diferencia === null ? '—' : (r.diferencia > 0 ? '+' : '') + fmt(r.diferencia)}</td>
-      <td>${badgeContador(r.contadoPor)}</td>
+      <td class="num sist">${r.contadoU !== null ? fmt(r.contadoU) : '<span style="color:#b0b8c5">—</span>'}</td>
+      <td class="num sist ${r.diferencia === null ? '' : r.diferencia > 0 ? 'diff-neg' : r.diferencia < 0 ? 'diff-pos' : 'diff-zero'}">${r.diferencia === null ? '—' : (r.diferencia > 0 ? '+' : '') + fmt(r.diferencia)}</td>
       <td>${r.resultado === 'vacia_master' ? '<span class="badge badge-missing">VACÍA</span>' : badgeRes(r.resultado)}</td>
     </tr>`).join('')}</tbody>`;
 }
@@ -1127,6 +1120,7 @@ function clasificarZona(masterRow, fallbackUbi) {
 
 function renderOcupacion() {
   if (!state.sistemaRaw || !state.masterIdx) return;
+  if (!document.getElementById("donutWrap")) return; // sección removida
   // Set de ubicaciones únicas con stock UBICADO o ASIGNADO (del CSV LPN Cajas)
   const ESTADOS_OCUPADO = new Set(['UBICADO', 'ASIGNADO']);
   const ubisOcupadas = new Set();
