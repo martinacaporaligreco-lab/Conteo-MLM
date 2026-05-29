@@ -32,16 +32,16 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
 .config-item input.wide { width: 200px; }
 .config-meta { color: #8590a8; font-size: 12px; margin-left: auto; }
 .upload-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; margin: 16px 32px 0; }
-.upload-card { background: #fff; border: 2px dashed #c7d0dd; border-radius: 12px; padding: 22px 18px; text-align: center; transition: all .2s; }
+.upload-card { background: #fff; border: 2px dashed #c7d0dd; border-radius: 10px; padding: 10px 12px; text-align: center; transition: all .2s; }
 .upload-card.loaded { border-style: solid; border-color: #2ecc71; background: #f0faf4; }
 .upload-card.error { border-color: #e74c3c; background: #fdf2f1; }
 .upload-card.dragover { border-color: #4a90e2; background: #eef5ff; }
-.upload-icon { font-size: 32px; margin-bottom: 8px; display: block; }
-.upload-title { font-size: 14px; font-weight: 700; margin-bottom: 4px; letter-spacing: .3px; }
-.upload-subtitle { font-size: 11px; color: #5a6378; margin-bottom: 12px; font-family: ui-monospace, monospace; }
-.btn-load { background: #4a90e2; color: #fff; border: none; padding: 8px 20px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 500; display: inline-block; text-align: center; user-select: none; }
+.upload-icon { font-size: 22px; margin-bottom: 4px; display: block; }
+.upload-title { font-size: 12px; font-weight: 700; margin-bottom: 2px; letter-spacing: .3px; }
+.upload-subtitle { font-size: 10px; color: #5a6378; margin-bottom: 6px; font-family: ui-monospace, monospace; }
+.btn-load { background: #4a90e2; color: #fff; border: none; padding: 5px 14px; border-radius: 5px; cursor: pointer; font-size: 12px; font-weight: 500; display: inline-block; text-align: center; user-select: none; }
 .btn-load:hover { background: #3a7fd1; }
-.upload-status { font-size: 11px; color: #8590a8; margin-top: 8px; word-break: break-word; }
+.upload-status { font-size: 10px; color: #8590a8; margin-top: 4px; word-break: break-word; }
 .upload-card.loaded .upload-status { color: #2ecc71; font-weight: 600; }
 .exec-bar { margin: 20px 32px; display: flex; align-items: center; gap: 16px; }
 .btn-exec { background: #6c7787; color: #fff; border: none; padding: 12px 28px; border-radius: 8px; cursor: not-allowed; font-size: 14px; font-weight: 600; }
@@ -761,11 +761,11 @@ function ejecutarControl() {
   });
   const fisicoAgg = {};
   state.fisicoRaw.forEach(r => {
-    const sku = normKey(r['SKU / Código'] || r['SKU'] || r['Código'] || r['Codigo'] || r['Producto'] || r['PRODUCTO']);
+    const sku = normKey(r['SKU / Código'] || r['SKU Código'] || r['SKU'] || r['Código'] || r['Codigo'] || r['Producto'] || r['PRODUCTO']);
     const ubi = normKey(r['Ubicación / Posición'] || r['Ubicación'] || r['Ubicacion'] || r['UBICACION'] || r['Posición'] || r['Posicion']);
     if (!sku) return;
     const cleanN = v => parseFloat(String(v || '').replace(/[^\d.\-]/g, ''));
-    const cf = cleanN(r['Conteo\nFinal'] || r['Conteo Final'] || r['Final']);
+    const cf = cleanN(r['Conteo\nFinal'] || r['Conteo Final'] || r['Uds Contadas'] || r['Final']);
     const c1 = cleanN(r['1.ª Conteo\nfísico'] || r['1.ª Conteo físico'] || r['1° Conteo']);
     const c2 = cleanN(r['2.ª Conteo\nfísico'] || r['2.ª Conteo físico'] || r['2° Conteo']);
     const c3 = cleanN(r['3.ª Conteo\nfísico'] || r['3.ª Conteo físico'] || r['3° Conteo']);
@@ -1059,10 +1059,10 @@ function renderFisicoDesglose() {
 function exportFisicoDesglose() {
   if (!state.fisicoRaw) { toast('Cargá el físico primero', 'err'); return; }
   const data = state.fisicoRaw.map(r => {
-    const sku = normKey(r['SKU / Código'] || r['SKU'] || r['Código'] || r['Codigo'] || r['Producto'] || r['PRODUCTO']);
+    const sku = normKey(r['SKU / Código'] || r['SKU Código'] || r['SKU'] || r['Código'] || r['Codigo'] || r['Producto'] || r['PRODUCTO']);
     const ubi = normKey(r['Ubicación / Posición'] || r['Ubicación'] || r['Ubicacion'] || r['UBICACION'] || r['Posición'] || r['Posicion']);
     const cleanN = v => parseFloat(String(v || '').replace(/[^\d.\-]/g, ''));
-    const cf = cleanN(r['Conteo\nFinal'] || r['Conteo Final'] || r['Final']);
+    const cf = cleanN(r['Conteo\nFinal'] || r['Conteo Final'] || r['Uds Contadas'] || r['Final']);
     const c1 = cleanN(r['1.ª Conteo\nfísico'] || r['1.ª Conteo físico']);
     const c2 = cleanN(r['2.ª Conteo\nfísico'] || r['2.ª Conteo físico']);
     const c3 = cleanN(r['3.ª Conteo\nfísico'] || r['3.ª Conteo físico']);
@@ -1383,11 +1383,11 @@ function renderAgregado() {
   const fisAgg = {};
   if (state.fisicoRaw) {
     state.fisicoRaw.forEach(r => {
-      const sku = normKey(r['SKU / Código'] || r['SKU'] || r['Código'] || r['Codigo'] || r['Producto'] || r['PRODUCTO']);
+      const sku = normKey(r['SKU / Código'] || r['SKU Código'] || r['SKU'] || r['Código'] || r['Codigo'] || r['Producto'] || r['PRODUCTO']);
       const ubi = normKey(r['Ubicación / Posición'] || r['Ubicación'] || r['Ubicacion'] || r['UBICACION'] || r['Posición'] || r['Posicion']);
       if (!sku) return;
       const cleanN = v => parseFloat(String(v||'').replace(/[^\d.\-]/g,''));
-      const cf = cleanN(r['Conteo\nFinal'] || r['Conteo Final'] || r['Final']);
+      const cf = cleanN(r['Conteo\nFinal'] || r['Conteo Final'] || r['Uds Contadas'] || r['Final']);
       const c1 = cleanN(r['1.ª Conteo\nfísico'] || r['1.ª Conteo físico'] || r['1° Conteo']);
       const c2 = cleanN(r['2.ª Conteo\nfísico'] || r['2.ª Conteo físico'] || r['2° Conteo']);
       const c3 = cleanN(r['3.ª Conteo\nfísico'] || r['3.ª Conteo físico'] || r['3° Conteo']);
@@ -1431,11 +1431,11 @@ function exportAgregado() {
   const fisAgg = {};
   if (state.fisicoRaw) {
     state.fisicoRaw.forEach(r => {
-      const sku = normKey(r['SKU / Código'] || r['SKU'] || r['Código'] || r['Codigo'] || r['Producto'] || r['PRODUCTO']);
+      const sku = normKey(r['SKU / Código'] || r['SKU Código'] || r['SKU'] || r['Código'] || r['Codigo'] || r['Producto'] || r['PRODUCTO']);
       const ubi = normKey(r['Ubicación / Posición'] || r['Ubicación'] || r['Ubicacion'] || r['UBICACION'] || r['Posición'] || r['Posicion']);
       if (!sku) return;
       const cleanN = v => parseFloat(String(v||'').replace(/[^\d.\-]/g,''));
-      const cf = cleanN(r['Conteo\nFinal'] || r['Conteo Final'] || r['Final']);
+      const cf = cleanN(r['Conteo\nFinal'] || r['Conteo Final'] || r['Uds Contadas'] || r['Final']);
       const c1 = cleanN(r['1.ª Conteo\nfísico'] || r['1.ª Conteo físico'] || r['1° Conteo']);
       const c2 = cleanN(r['2.ª Conteo\nfísico'] || r['2.ª Conteo físico'] || r['2° Conteo']);
       const c3 = cleanN(r['3.ª Conteo\nfísico'] || r['3.ª Conteo físico'] || r['3° Conteo']);
