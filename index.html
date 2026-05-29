@@ -933,6 +933,7 @@ function renderInventarioCompleto() {
   if (fo === 'terceros') data = data.filter(r => r.contadoPor === 'TERCEROS');
   else if (fo === 'sistema') data = data.filter(r => r.contadoPor === 'SISTEMA');
   else if (fo === 'sin_conteo') data = data.filter(r => r.contadoPor === 'SIN_CONTEO');
+  data = data.slice().sort((a,b)=>(a.ubicacion||'').localeCompare(b.ubicacion||''));
   $('tablaInvCompleto').innerHTML = `<thead><tr>
     <th>Ubicación</th><th>SKU</th>
     <th class="num sist">Sistémico</th><th class="num sist">Físico</th><th class="num sist">Diferencia</th>
@@ -1085,11 +1086,11 @@ function renderFisicoDesglose() {
     <div class="mini-stat"><div class="mini-stat-label">Σ Unidades contadas</div><div class="mini-stat-value">${fmt(totUnid)}</div></div>`;
   let data = rows;
   if (q) data = data.filter(r => r.sku.includes(q) || r.ubi.includes(q));
+  data = data.slice().sort((a,b)=>(a.ubi||'').localeCompare(b.ubi||''));
   $('tablaFisicoDesglose').innerHTML = `<thead><tr>
     <th>Ubicación</th><th>SKU</th>
     <th class="num sist">LPNs</th>
     <th class="num sist">1° Conteo</th><th class="num sist">2° Conteo</th><th class="num sist">3° Conteo</th><th class="num sist">Final</th>
-    <th>Observaciones</th>
   </tr></thead><tbody>${data.slice(0, 3000).map(r => `
     <tr>
       <td><strong>${r.ubi || '<vacío>'}</strong></td>
@@ -1099,7 +1100,6 @@ function renderFisicoDesglose() {
       <td class="num sist">${r.c2 !== null ? fmt(r.c2) : '—'}</td>
       <td class="num sist">${r.c3 !== null ? fmt(r.c3) : '—'}</td>
       <td class="num sist"><strong>${fmt(r.final)}</strong></td>
-      <td>${r.obs}</td>
     </tr>`).join('')}</tbody>`;
 }
 
@@ -1522,6 +1522,7 @@ function renderCruce() {
   let d = state.cruce;
   if (q) d = d.filter(r=>(r.sku||'').includes(q)||(r.ubicacion||'').includes(q)||(r.descripcion||'').toUpperCase().includes(q));
   if (fl) { if (fl==='dif') d = d.filter(r=>r.resultado!=='ok'&&r.resultado!=='no_contado'); else d = d.filter(r=>r.resultado===fl); }
+  d = d.slice().sort((a,b)=>(a.ubicacion||'').localeCompare(b.ubicacion||''));
   $('tablaCruce').innerHTML = `<thead><tr><th>SKU</th><th>Ubicación</th><th>Zona</th><th class="num">LPNs</th><th class="num">Sistema</th><th class="num">Contado</th><th class="num">Diferencia</th><th class="num">Exactitud</th><th>Resultado</th><th>Observaciones</th></tr></thead><tbody>${d.slice(0,2000).map(r=>`<tr><td><strong>${r.sku||''}</strong></td><td>${r.ubicacion||''}</td><td>${r.zona||''}</td><td class="num">${fmt(r.lpns)}</td><td class="num">${r.sistemaU!==null?fmt(r.sistemaU):'—'}</td><td class="num">${r.contadoU!==null?fmt(r.contadoU):'—'}</td><td class="num ${r.diferencia>0?'diff-neg':r.diferencia<0?'diff-pos':'diff-zero'}">${r.diferencia===null?'—':(r.diferencia>0?'+':'')+fmt(r.diferencia)}</td><td class="num">${r.exactitud!==null?fmtPct(r.exactitud):'—'}</td><td>${badgeRes(r.resultado)}</td><td>${r.observaciones||''}</td></tr>`).join('')}</tbody>`;
 }
 
