@@ -171,11 +171,8 @@ tbody tr:hover { background: #f8faff; }
   <div class="tab active" data-tab="resumen">📊 Resumen General</div>
   <div class="tab" data-tab="fisico">📋 Conteo Físico</div>
   <div class="tab" data-tab="cruce">🔁 Cruce Sistema ↔ Físico</div>
-  <div class="tab" data-tab="hallazgos">⚠️ Hallazgos</div>
   <div class="tab" data-tab="alcance">🎯 Alcance</div>
   <div class="tab" data-tab="ajustes">📝 Pendientes Ajuste</div>
-  <div class="tab" data-tab="aplicados">✅ Ajustes Aplicados</div>
-  <div class="tab" data-tab="bases">🔎 Bases / Diagnóstico</div>
 </div>
 <div class="config-bar">
   <div class="config-item"><label>Quarter:</label>
@@ -1523,7 +1520,7 @@ function renderCruce() {
   if (q) d = d.filter(r=>(r.sku||'').includes(q)||(r.ubicacion||'').includes(q)||(r.descripcion||'').toUpperCase().includes(q));
   if (fl) { if (fl==='dif') d = d.filter(r=>r.resultado!=='ok'&&r.resultado!=='no_contado'); else d = d.filter(r=>r.resultado===fl); }
   d = d.slice().sort((a,b)=>(a.ubicacion||'').localeCompare(b.ubicacion||''));
-  $('tablaCruce').innerHTML = `<thead><tr><th>SKU</th><th>Ubicación</th><th>Zona</th><th class="num">LPNs</th><th class="num">Sistema</th><th class="num">Contado</th><th class="num">Diferencia</th><th class="num">Exactitud</th><th>Resultado</th><th>Observaciones</th></tr></thead><tbody>${d.slice(0,2000).map(r=>`<tr><td><strong>${r.sku||''}</strong></td><td>${r.ubicacion||''}</td><td>${r.zona||''}</td><td class="num">${fmt(r.lpns)}</td><td class="num">${r.sistemaU!==null?fmt(r.sistemaU):'—'}</td><td class="num">${r.contadoU!==null?fmt(r.contadoU):'—'}</td><td class="num ${r.diferencia>0?'diff-neg':r.diferencia<0?'diff-pos':'diff-zero'}">${r.diferencia===null?'—':(r.diferencia>0?'+':'')+fmt(r.diferencia)}</td><td class="num">${r.exactitud!==null?fmtPct(r.exactitud):'—'}</td><td>${badgeRes(r.resultado)}</td><td>${r.observaciones||''}</td></tr>`).join('')}</tbody>`;
+  $('tablaCruce').innerHTML = `<thead><tr><th>SKU</th><th>Ubicación</th><th class="num sist">Sistema</th><th class="num sist">Contado</th><th class="num sist">Diferencia</th><th class="num sist">Exactitud</th><th>Resultado</th></tr></thead><tbody>${d.slice(0,2000).map(r=>`<tr><td><strong>${r.sku||''}</strong></td><td>${r.ubicacion||''}</td><td class="num sist">${r.sistemaU!==null?fmt(r.sistemaU):'—'}</td><td class="num sist">${r.contadoU!==null?fmt(r.contadoU):'—'}</td><td class="num sist ${r.diferencia>0?'diff-neg':r.diferencia<0?'diff-pos':'diff-zero'}">${r.diferencia===null?'—':(r.diferencia>0?'+':'')+fmt(r.diferencia)}</td><td class="num sist">${r.exactitud!==null?fmtPct(r.exactitud):'—'}</td><td>${badgeRes(r.resultado)}</td></tr>`).join('')}</tbody>`;
 }
 
 function renderHallazgos() {
