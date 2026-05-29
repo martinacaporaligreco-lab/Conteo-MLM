@@ -77,6 +77,7 @@ tbody tr:hover { background: #f8faff; }
 .num.sist { text-align: center; }
 .ubi-ok { color: #1e7e3b; font-weight: 700; }
 .ubi-dif { color: #c0392b; font-weight: 700; }
+.ubi-nc { color: #6c757d; font-weight: 600; }
 .chip { padding: 5px 12px; border-radius: 16px; background: #eef2f7; color: #1a2540; font-size: 12px; font-weight: 600; cursor: pointer; user-select: none; border: 1px solid transparent; transition: all .15s; }
 .chip:hover { background: #dfe6ef; }
 .chip.active { background: #1e3a5f; color: #fff; border-color: #1e3a5f; }
@@ -309,12 +310,12 @@ tbody tr:hover { background: #f8faff; }
   </div>
   <div class="panel" id="panel-cruce">
     <div class="section-card">
-      <div class="section-title">🏆 Top 20 mayores diferencias</div>
+      <div class="section-title">🏆 Top 20 mayores diferencias <button class="btn-export" onclick="exportTopDif()">⬇ Exportar Excel</button></div>
       <div class="section-desc">Las 20 ubicaciones con mayor diferencia absoluta. Foco rápido en lo más importante.</div>
       <div class="table-wrap"><table id="tablaTopDif"></table></div>
     </div>
     <div class="section-card">
-      <div class="section-title">📦 Resumen por SKU</div>
+      <div class="section-title">📦 Resumen por SKU <button class="btn-export" onclick="exportResSKU()">⬇ Exportar Excel</button></div>
       <div class="section-desc">Cantidad de ubicaciones con diferencia, total sistémico vs físico, y desvío neto por SKU.</div>
       <div class="table-wrap" style="max-height:400px"><table id="tablaResSKU"></table></div>
     </div>
@@ -1002,7 +1003,7 @@ function renderInventarioCompleto() {
     `; })()}
   </tr></thead><tbody>${data.slice(0, 3000).map(r => `
     <tr>
-      <td><strong>${r.ubicacion}</strong></td>
+      <td><strong class="${r.resultado==='ok' ? 'ubi-ok' : r.resultado==='no_contado' ? 'ubi-nc' : (r.resultado==='faltante' || r.resultado==='sobrante' || r.resultado==='solo_fisico') ? 'ubi-dif' : ''}">${r.ubicacion}</strong></td>
       <td><strong>${r.sku}</strong></td>
       <td class="num sist">${fmt(r.sistemaU)}</td>
       <td class="num sist">${r.contadoU !== null ? fmt(r.contadoU) : '<span style="color:#b0b8c5">—</span>'}</td>
@@ -1635,7 +1636,7 @@ function renderCruce() {
     }
   });
   const cArr = c => cs.col === c ? (cs.dir === 'asc' ? ' ▲' : ' ▼') : ' ⇅';
-  $('tablaCruce').innerHTML = `<thead><tr><th onclick="toggleCruceSort('sku')" style="cursor:pointer;user-select:none">SKU${cArr('sku')}</th><th onclick="toggleCruceSort('ubi')" style="cursor:pointer;user-select:none">Ubicación${cArr('ubi')}</th><th class="num sist" onclick="toggleCruceSort('sistema')" style="cursor:pointer;user-select:none">Sistema${cArr('sistema')}</th><th class="num sist" onclick="toggleCruceSort('contado')" style="cursor:pointer;user-select:none">Contado${cArr('contado')}</th><th class="num sist" onclick="toggleCruceSort('diferencia')" style="cursor:pointer;user-select:none">Diferencia${cArr('diferencia')}</th><th class="num sist" onclick="toggleCruceSort('exactitud')" style="cursor:pointer;user-select:none">Exactitud${cArr('exactitud')}</th><th onclick="toggleCruceSort('resultado')" style="cursor:pointer;user-select:none">Resultado${cArr('resultado')}</th></tr></thead><tbody>${d.slice(0,2000).map(r=>`<tr><td><strong>${r.sku||''}</strong></td><td class="${r.resultado==='ok' ? 'ubi-ok' : (r.resultado==='faltante' || r.resultado==='sobrante' || r.resultado==='solo_fisico' || r.resultado==='no_contado') ? 'ubi-dif' : ''}">${r.ubicacion||''}</td><td class="num sist">${r.sistemaU!==null?fmt(r.sistemaU):'—'}</td><td class="num sist">${r.contadoU!==null?fmt(r.contadoU):'—'}</td><td class="num sist ${r.diferencia>0?'diff-neg':r.diferencia<0?'diff-pos':'diff-zero'}">${r.diferencia===null?'—':(r.diferencia>0?'+':'')+fmt(r.diferencia)}</td><td class="num sist">${r.exactitud!==null?fmtPct(r.exactitud):'—'}</td><td>${badgeRes(r.resultado)}</td></tr>`).join('')}</tbody>`;
+  $('tablaCruce').innerHTML = `<thead><tr><th onclick="toggleCruceSort('sku')" style="cursor:pointer;user-select:none">SKU${cArr('sku')}</th><th onclick="toggleCruceSort('ubi')" style="cursor:pointer;user-select:none">Ubicación${cArr('ubi')}</th><th class="num sist" onclick="toggleCruceSort('sistema')" style="cursor:pointer;user-select:none">Sistema${cArr('sistema')}</th><th class="num sist" onclick="toggleCruceSort('contado')" style="cursor:pointer;user-select:none">Contado${cArr('contado')}</th><th class="num sist" onclick="toggleCruceSort('diferencia')" style="cursor:pointer;user-select:none">Diferencia${cArr('diferencia')}</th><th class="num sist" onclick="toggleCruceSort('exactitud')" style="cursor:pointer;user-select:none">Exactitud${cArr('exactitud')}</th><th onclick="toggleCruceSort('resultado')" style="cursor:pointer;user-select:none">Resultado${cArr('resultado')}</th></tr></thead><tbody>${d.slice(0,2000).map(r=>`<tr><td><strong>${r.sku||''}</strong></td><td class="${r.resultado==='ok' ? 'ubi-ok' : r.resultado==='no_contado' ? 'ubi-nc' : (r.resultado==='faltante' || r.resultado==='sobrante' || r.resultado==='solo_fisico') ? 'ubi-dif' : ''}">${r.ubicacion||''}</td><td class="num sist">${r.sistemaU!==null?fmt(r.sistemaU):'—'}</td><td class="num sist">${r.contadoU!==null?fmt(r.contadoU):'—'}</td><td class="num sist ${r.diferencia>0?'diff-neg':r.diferencia<0?'diff-pos':'diff-zero'}">${r.diferencia===null?'—':(r.diferencia>0?'+':'')+fmt(r.diferencia)}</td><td class="num sist">${r.exactitud!==null?fmtPct(r.exactitud):'—'}</td><td>${badgeRes(r.resultado)}</td></tr>`).join('')}</tbody>`;
 }
 
 function renderHallazgos() {
@@ -1699,6 +1700,60 @@ function renderAjustes() {
 
 function buildWB(data, sn) { const wb = XLSX.utils.book_new(); const ws = XLSX.utils.json_to_sheet(data); XLSX.utils.book_append_sheet(wb, ws, sn); return wb; }
 function expSuf() { return $('cfgQuarter').value + '_' + $('cfgYear').value + '_' + new Date().toISOString().slice(0,10); }
+function exportTopDif() {
+  if (!state.cruce) { toast('Ejecutá primero','err'); return; }
+  const RES_LABEL = { ok: 'OK', faltante: 'FALTANTE', sobrante: 'SOBRANTE', no_contado: 'NO CONTADO', solo_fisico: 'SOLO FÍSICO' };
+  const top = state.cruce.slice().filter(r => r.diferencia !== null && r.diferencia !== 0)
+    .sort((a, b) => Math.abs(b.diferencia || 0) - Math.abs(a.diferencia || 0))
+    .slice(0, 20);
+  const d = top.map((r, i) => ({
+    '#': i + 1,
+    'SKU': r.sku || '',
+    'Ubicación': r.ubicacion || '',
+    'Sistema': r.sistemaU !== null ? r.sistemaU : 0,
+    'Contado': r.contadoU !== null ? r.contadoU : 0,
+    'Diferencia': r.diferencia !== null ? r.diferencia : 0,
+    'Resultado': RES_LABEL[r.resultado] || r.resultado || ''
+  }));
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.json_to_sheet(d);
+  ws['!cols'] = [{wch:4},{wch:10},{wch:22},{wch:12},{wch:12},{wch:12},{wch:14}];
+  if (d.length > 0) ws['!autofilter'] = { ref: ws['!ref'] };
+  XLSX.utils.book_append_sheet(wb, ws, 'Top 20 Diferencias');
+  XLSX.writeFile(wb, 'Top20_Diferencias_' + expSuf() + '.xlsx');
+  toast('Top 20 exportado', 'ok');
+}
+
+function exportResSKU() {
+  if (!state.cruce) { toast('Ejecutá primero','err'); return; }
+  const bySku = {};
+  state.cruce.forEach(r => {
+    const k = r.sku || '(sin sku)';
+    if (!bySku[k]) bySku[k] = { sku: k, ubisDif: 0, ubisOk: 0, sistema: 0, contado: 0, diff: 0 };
+    bySku[k].sistema += r.sistemaU || 0;
+    bySku[k].contado += r.contadoU || 0;
+    bySku[k].diff += r.diferencia || 0;
+    if (r.resultado === 'ok') bySku[k].ubisOk += 1;
+    else if (r.diferencia !== null && r.diferencia !== 0) bySku[k].ubisDif += 1;
+  });
+  const list = Object.values(bySku).sort((a, b) => Math.abs(b.diff) - Math.abs(a.diff));
+  const d = list.map(s => ({
+    'SKU': s.sku,
+    'Ubic. OK': s.ubisOk,
+    'Ubic. con dif': s.ubisDif,
+    'Sistema': s.sistema,
+    'Contado': s.contado,
+    'Desvío neto': s.diff
+  }));
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.json_to_sheet(d);
+  ws['!cols'] = [{wch:10},{wch:11},{wch:14},{wch:12},{wch:12},{wch:14}];
+  if (d.length > 0) ws['!autofilter'] = { ref: ws['!ref'] };
+  XLSX.utils.book_append_sheet(wb, ws, 'Resumen por SKU');
+  XLSX.writeFile(wb, 'Resumen_SKU_' + expSuf() + '.xlsx');
+  toast('Resumen por SKU exportado', 'ok');
+}
+
 function exportCruce() {
   if (!state.cruce) { toast('Ejecutá primero','err'); return; }
   const RES_LABEL = { ok: 'OK', faltante: 'FALTANTE', sobrante: 'SOBRANTE', no_contado: 'NO CONTADO', solo_fisico: 'SOLO FÍSICO' };
