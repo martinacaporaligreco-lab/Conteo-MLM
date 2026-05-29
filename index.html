@@ -1028,30 +1028,9 @@ function renderFisicoDesglose() {
   const colC3 = findCol([/3[°ª\.].*conteo/i, /conteo.*3/i]);
   const colObs = findCol([/observaci/i, /causa/i]);
 
-  // Mostrar diagnóstico encima de la tabla
-  let diagDiv = $('fis-diag');
-  if (!diagDiv) {
-    diagDiv = document.createElement('div');
-    diagDiv.id = 'fis-diag';
-    diagDiv.style.cssText = 'background:#f8faff;border:1px solid #d4dae3;border-radius:6px;padding:10px 14px;margin-bottom:12px;font-size:12px;color:#1a2540';
-    const tbl = $('tablaFisicoDesglose');
-    tbl.parentNode.insertBefore(diagDiv, tbl);
-  }
-  const todasOK = !!(colSKU && colUbi && colFinal);
-  diagDiv.innerHTML = `
-    <div style="font-weight:700;margin-bottom:6px">🔎 Diagnóstico de columnas detectadas <span style="color:${todasOK?'#2ecc71':'#e74c3c'}">${todasOK?'✓':'⚠'}</span></div>
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px">
-      <div><strong>SKU:</strong> ${colSKU || '<span style="color:#e74c3c">NO DETECTADO</span>'}</div>
-      <div><strong>Ubicación:</strong> ${colUbi || '<span style="color:#e74c3c">NO DETECTADO</span>'}</div>
-      <div><strong>Conteo Final:</strong> ${colFinal || '<span style="color:#e74c3c">NO DETECTADO</span>'}</div>
-      <div><strong>1° Conteo:</strong> ${colC1 || '—'}</div>
-      <div><strong>2° Conteo:</strong> ${colC2 || '—'}</div>
-      <div><strong>3° Conteo:</strong> ${colC3 || '—'}</div>
-      <div><strong>Observaciones:</strong> ${colObs || '—'}</div>
-      <div><strong>Descripción:</strong> ${colDesc || '—'}</div>
-    </div>
-    <div style="margin-top:8px;font-size:11px;color:#5a6378">Todas las columnas del archivo: ${allKeys.join(' · ') || '<vacío>'}</div>
-  `;
+  // Diagnóstico removido a pedido del usuario
+  const _existingDiag = $('fis-diag');
+  if (_existingDiag) _existingDiag.remove();
 
   const cleanN = v => parseFloat(String(v == null ? '' : v).replace(/[^\d.\-]/g, ''));
   // Detectar columnas adicionales útiles (LPN y Uds Contadas)
@@ -1551,6 +1530,17 @@ function renderPreviewTable(id, data, cols, lim) {
   $(id).innerHTML = h + b;
 }
 
+function toggleCruceSort(col) {
+  if (!state.cruceSort) state.cruceSort = { col: 'ubi', dir: 'asc' };
+  if (state.cruceSort.col === col) {
+    state.cruceSort.dir = state.cruceSort.dir === 'asc' ? 'desc' : 'asc';
+  } else {
+    state.cruceSort.col = col;
+    state.cruceSort.dir = (col === 'ubi' || col === 'sku' || col === 'resultado') ? 'asc' : 'desc';
+  }
+  renderCruce();
+}
+
 function renderCruce() {
   if (!state.cruce) return;
   const q = ($('searchCruce').value||'').toUpperCase().trim();
@@ -1558,8 +1548,32 @@ function renderCruce() {
   let d = state.cruce;
   if (q) d = d.filter(r=>(r.sku||'').includes(q)||(r.ubicacion||'').includes(q)||(r.descripcion||'').toUpperCase().includes(q));
   if (fl) { if (fl==='dif') d = d.filter(r=>r.resultado!=='ok'&&r.resultado!=='no_contado'); else d = d.filter(r=>r.resultado===fl); }
-  d = d.slice().sort((a,b)=>(a.ubicacion||'').localeCompare(b.ubicacion||''));
-  $('tablaCruce').innerHTML = `<thead><tr><th>SKU</th><th>Ubicación</th><th class="num sist">Sistema</th><th class="num sist">Contado</th><th class="num sist">Diferencia</th><th class="num sist">Exactitud</th><th>Resultado</th></tr></thead><tbody>${d.slice(0,2000).map(r=>`<tr><td><strong>${r.sku||''}</strong></td><td>${r.ubicacion||''}</td><td class="num sist">${r.sistemaU!==null?fmt(r.sistemaU):'—'}</td><td class="num sist">${r.contadoU!==null?fmt(r.contadoU):'—'}</td><td class="num sist ${r.diferencia>0?'diff-neg':r.diferencia<0?'diff-pos':'diff-zero'}">${r.diferencia===null?'—':(r.diferencia>0?'+':'')+fmt(r.diferencia)}</td><td class="num sist">${r.exactitud!==null?fmtPct(r.exactitud):'—'}</td><td>${badgeRes(r.resultado)}</td></tr>`).join('')}</tbody>`;
+  // Sort por columna con dirección
+  const cs = state.cruceSort || { col: 'ubi', dir: 'asc' };
+  const cDir = cs.dir === 'asc' ? 1 : -1;
+  const cmpS = (a,b) => (a||'').localeCompare(b||'') * cDir;
+  const cmpN = (a,b) => {
+    const an = a === null || a === undefined ? null : Number(a);
+    const bn = b === null || b === undefined ? null : Number(b);
+    if (an === null && bn === null) return 0;
+    if (an === null) return 1;
+    if (bn === null) return -1;
+    return (an - bn) * cDir;
+  };
+  d = d.slice().sort((a, b) => {
+    switch (cs.col) {
+      case 'sku': return cmpS(a.sku, b.sku) || cmpS(a.ubicacion, b.ubicacion);
+      case 'ubi': return cmpS(a.ubicacion, b.ubicacion) || cmpS(a.sku, b.sku);
+      case 'sistema': return cmpN(a.sistemaU, b.sistemaU) || cmpS(a.ubicacion, b.ubicacion);
+      case 'contado': return cmpN(a.contadoU, b.contadoU) || cmpS(a.ubicacion, b.ubicacion);
+      case 'diferencia': return cmpN(a.diferencia, b.diferencia) || cmpS(a.ubicacion, b.ubicacion);
+      case 'exactitud': return cmpN(a.exactitud, b.exactitud) || cmpS(a.ubicacion, b.ubicacion);
+      case 'resultado': return cmpS(a.resultado, b.resultado) || cmpS(a.ubicacion, b.ubicacion);
+      default: return cmpS(a.ubicacion, b.ubicacion);
+    }
+  });
+  const cArr = c => cs.col === c ? (cs.dir === 'asc' ? ' ▲' : ' ▼') : ' ⇅';
+  $('tablaCruce').innerHTML = `<thead><tr><th onclick="toggleCruceSort('sku')" style="cursor:pointer;user-select:none">SKU${cArr('sku')}</th><th onclick="toggleCruceSort('ubi')" style="cursor:pointer;user-select:none">Ubicación${cArr('ubi')}</th><th class="num sist" onclick="toggleCruceSort('sistema')" style="cursor:pointer;user-select:none">Sistema${cArr('sistema')}</th><th class="num sist" onclick="toggleCruceSort('contado')" style="cursor:pointer;user-select:none">Contado${cArr('contado')}</th><th class="num sist" onclick="toggleCruceSort('diferencia')" style="cursor:pointer;user-select:none">Diferencia${cArr('diferencia')}</th><th class="num sist" onclick="toggleCruceSort('exactitud')" style="cursor:pointer;user-select:none">Exactitud${cArr('exactitud')}</th><th onclick="toggleCruceSort('resultado')" style="cursor:pointer;user-select:none">Resultado${cArr('resultado')}</th></tr></thead><tbody>${d.slice(0,2000).map(r=>`<tr><td><strong>${r.sku||''}</strong></td><td>${r.ubicacion||''}</td><td class="num sist">${r.sistemaU!==null?fmt(r.sistemaU):'—'}</td><td class="num sist">${r.contadoU!==null?fmt(r.contadoU):'—'}</td><td class="num sist ${r.diferencia>0?'diff-neg':r.diferencia<0?'diff-pos':'diff-zero'}">${r.diferencia===null?'—':(r.diferencia>0?'+':'')+fmt(r.diferencia)}</td><td class="num sist">${r.exactitud!==null?fmtPct(r.exactitud):'—'}</td><td>${badgeRes(r.resultado)}</td></tr>`).join('')}</tbody>`;
 }
 
 function renderHallazgos() {
