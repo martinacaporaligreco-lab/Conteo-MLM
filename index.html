@@ -1630,9 +1630,9 @@ function exportCruce() {
   const d = sorted.map(r=>({
     'SKU': r.sku || '',
     'Ubicación': r.ubicacion || '',
-    'Sistema': r.sistemaU !== null && r.sistemaU !== undefined ? r.sistemaU : '',
-    'Contado': r.contadoU !== null && r.contadoU !== undefined ? r.contadoU : '',
-    'Diferencia': r.diferencia !== null && r.diferencia !== undefined ? r.diferencia : '',
+    'Sistema': r.sistemaU !== null && r.sistemaU !== undefined ? r.sistemaU : 0,
+    'Contado': r.contadoU !== null && r.contadoU !== undefined ? r.contadoU : 0,
+    'Diferencia': r.diferencia !== null && r.diferencia !== undefined ? r.diferencia : 0,
     'Exactitud': r.exactitud !== null && r.exactitud !== undefined ? Math.round(r.exactitud * 1000) / 10 + '%' : '',
     'Resultado': RES_LABEL[r.resultado] || r.resultado || ''
   }));
