@@ -74,6 +74,7 @@ th { padding: 10px 12px; text-align: left; font-weight: 600; color: #1a2540; fon
 td { padding: 9px 12px; border-bottom: 1px solid #eef1f6; color: #1a2540; }
 tbody tr:hover { background: #f8faff; }
 .num { text-align: right; font-variant-numeric: tabular-nums; font-family: ui-monospace, monospace; }
+.num.sist { text-align: center; }
 .diff-neg { color: #e74c3c; font-weight: 600; }
 .diff-pos { color: #f39c12; font-weight: 600; }
 .diff-zero { color: #2ecc71; }
@@ -948,7 +949,7 @@ function renderInventarioCompleto() {
       <td>${r.zona || ''}</td>
       <td>${r.tipo || ''}</td>
       <td><strong>${r.sku}</strong></td>
-      <td class="num">${fmt(r.sistemaU)}</td>
+      <td class="num sist">${r.sistemaU !== null && r.sistemaU !== undefined && !isNaN(r.sistemaU) ? Number(r.sistemaU) : "—"}</td>
       <td class="num">${r.contadoU !== null ? fmt(r.contadoU) : '<span style="color:#b0b8c5">—</span>'}</td>
       <td class="num ${r.diferencia === null ? '' : r.diferencia > 0 ? 'diff-neg' : r.diferencia < 0 ? 'diff-pos' : 'diff-zero'}">${r.diferencia === null ? '—' : (r.diferencia > 0 ? '+' : '') + fmt(r.diferencia)}</td>
       <td>${badgeContador(r.contadoPor)}</td>
@@ -1266,7 +1267,7 @@ function renderZonasOperativas() {
     const rowsHtml = z.items.slice(0, 100).map(r => {
       const dif = (r.sistemaU !== null && r.contadoU !== null) ? (r.sistemaU - r.contadoU) : null;
       const difClass = dif === null ? '' : dif > 0 ? 'diff-neg' : dif < 0 ? 'diff-pos' : 'diff-zero';
-      return `<tr><td>${r.ubicacion}</td><td><strong>${r.sku}</strong></td><td class="num">${fmt(r.sistemaU)}</td><td class="num">${r.contadoU !== null ? fmt(r.contadoU) : '—'}</td><td class="num ${difClass}">${dif === null ? '—' : (dif > 0 ? '+' : '') + fmt(dif)}</td></tr>`;
+      return `<tr><td>${r.ubicacion}</td><td><strong>${r.sku}</strong></td><td class="num sist">${r.sistemaU !== null && r.sistemaU !== undefined && !isNaN(r.sistemaU) ? Number(r.sistemaU) : "—"}</td><td class="num">${r.contadoU !== null ? fmt(r.contadoU) : '—'}</td><td class="num ${difClass}">${dif === null ? '—' : (dif > 0 ? '+' : '') + fmt(dif)}</td></tr>`;
     }).join('');
     const tabla = z.items.length === 0
       ? `<div class="zona-empty">Sin stock</div>`
@@ -1321,7 +1322,7 @@ function renderResumen() {
     [['OK','dot-green',s.ok,'#2ecc71'],['Faltante','dot-red',s.falt,'#e74c3c'],['Sobrante','dot-yellow',s.sob,'#f39c12'],['No contado','dot-gray',s.nc,'#b0b8c5'],['Solo físico','dot-gray',s.sf,'#8590a8']]
     .map(([l,d,v,col])=>`<div><span class="dot ${d}"></span> ${l}</div><div style="background:#f0f3f7;height:22px;border-radius:4px;overflow:hidden"><div style="background:${col};height:100%;width:${(v/mx*100).toFixed(1)}%"></div></div><div class="num" style="font-weight:600">${fmt(v)}</div>`).join('') + '</div>';
   const top = c.filter(x => x.diferencia !== null && x.diferencia !== 0).slice(0, 10);
-  $('topDiff').innerHTML = `<thead><tr><th>#</th><th>SKU</th><th>Ubicación</th><th class="num">Sistema</th><th class="num">Contado</th><th class="num">Diferencia</th><th>Resultado</th></tr></thead><tbody>${top.map((r,i)=>`<tr><td>${i+1}</td><td><strong>${r.sku}</strong></td><td>${r.ubicacion||'—'}</td><td class="num">${fmt(r.sistemaU)}</td><td class="num">${fmt(r.contadoU)}</td><td class="num ${r.diferencia>0?'diff-neg':'diff-pos'}">${r.diferencia>0?'+':''}${fmt(r.diferencia)}</td><td>${badgeRes(r.resultado)}</td></tr>`).join('')}</tbody>`;
+  $('topDiff').innerHTML = `<thead><tr><th>#</th><th>SKU</th><th>Ubicación</th><th class="num">Sistema</th><th class="num">Contado</th><th class="num">Diferencia</th><th>Resultado</th></tr></thead><tbody>${top.map((r,i)=>`<tr><td>${i+1}</td><td><strong>${r.sku}</strong></td><td>${r.ubicacion||'—'}</td><td class="num sist">${r.sistemaU !== null && r.sistemaU !== undefined && !isNaN(r.sistemaU) ? Number(r.sistemaU) : "—"}</td><td class="num">${fmt(r.contadoU)}</td><td class="num ${r.diferencia>0?'diff-neg':'diff-pos'}">${r.diferencia>0?'+':''}${fmt(r.diferencia)}</td><td>${badgeRes(r.resultado)}</td></tr>`).join('')}</tbody>`;
 }
 
 function renderBases() {
@@ -1424,7 +1425,7 @@ function renderAgregado() {
         <td>${r.ubicacion}</td>
         <td>${r.zona}</td>
         <td class="num">${fmt(r.lpns)}</td>
-        <td class="num">${fmt(r.sistemaU)}</td>
+        <td class="num sist">${r.sistemaU !== null && r.sistemaU !== undefined && !isNaN(r.sistemaU) ? Number(r.sistemaU) : "—"}</td>
         ${hayFisico ? `<td class="num">${fis !== null ? fmt(fis) : '<span style="color:#b0b8c5">—</span>'}</td>
         <td class="num ${dif === null ? '' : dif > 0 ? 'diff-neg' : dif < 0 ? 'diff-pos' : 'diff-zero'}">${dif === null ? '—' : (dif > 0 ? '+' : '') + fmt(dif)}</td>` : `<td class="num" style="color:#b0b8c5">—</td>`}
       </tr>`;
@@ -1516,7 +1517,7 @@ function renderAlcance() {
     ${masterStats}`;
 
   // Tabla "no contado" del cruce SKU+Ubi (existente)
-  $('tablaNoContado').innerHTML = `<thead><tr><th>SKU</th><th>Ubicación</th><th>Zona</th><th class="num">LPNs</th><th class="num">Unidades</th></tr></thead><tbody>${nc.slice(0,500).map(r=>`<tr><td><strong>${r.sku}</strong></td><td>${r.ubicacion}</td><td>${r.zona}</td><td class="num">${fmt(r.lpns)}</td><td class="num">${fmt(r.sistemaU)}</td></tr>`).join('')}</tbody>`;
+  $('tablaNoContado').innerHTML = `<thead><tr><th>SKU</th><th>Ubicación</th><th>Zona</th><th class="num">LPNs</th><th class="num">Unidades</th></tr></thead><tbody>${nc.slice(0,500).map(r=>`<tr><td><strong>${r.sku}</strong></td><td>${r.ubicacion}</td><td>${r.zona}</td><td class="num">${fmt(r.lpns)}</td><td class="num sist">${r.sistemaU !== null && r.sistemaU !== undefined && !isNaN(r.sistemaU) ? Number(r.sistemaU) : "—"}</td></tr>`).join('')}</tbody>`;
   $('tablaSoloFisico').innerHTML = `<thead><tr><th>SKU</th><th>Ubicación</th><th class="num">Contado</th><th>Obs</th></tr></thead><tbody>${sf.map(r=>`<tr><td><strong>${r.sku}</strong></td><td>${r.ubicacion}</td><td class="num">${fmt(r.contadoU)}</td><td>${r.observaciones||''}</td></tr>`).join('')}</tbody>`;
 
   // Tablas master (si está cargado)
@@ -1534,7 +1535,7 @@ function renderAlcance() {
 function renderAjustes() {
   if (!state.cruce) return;
   const a = state.cruce.filter(r=>(r.resultado==='faltante'||r.resultado==='sobrante'||r.resultado==='solo_fisico')&&r.ajustado!=='S'&&r.ajustado!=='SI');
-  $('tablaAjustes').innerHTML = `<thead><tr><th>SKU</th><th>Descripción</th><th>Ubicación</th><th class="num">Sistema</th><th class="num">Contado</th><th class="num">Diferencia</th><th>Acción</th><th>Obs</th></tr></thead><tbody>${a.map(r=>{const ac=r.resultado==='faltante'?'Ajuste negativo':r.resultado==='sobrante'?'Ajuste positivo':'Investigar';return `<tr><td><strong>${r.sku}</strong></td><td>${r.descripcion||''}</td><td>${r.ubicacion||''}</td><td class="num">${fmt(r.sistemaU)}</td><td class="num">${fmt(r.contadoU)}</td><td class="num ${r.diferencia>0?'diff-neg':'diff-pos'}">${(r.diferencia>0?'+':'')+fmt(r.diferencia)}</td><td>${ac}</td><td>${r.observaciones||''}</td></tr>`;}).join('')}</tbody>`;
+  $('tablaAjustes').innerHTML = `<thead><tr><th>SKU</th><th>Descripción</th><th>Ubicación</th><th class="num">Sistema</th><th class="num">Contado</th><th class="num">Diferencia</th><th>Acción</th><th>Obs</th></tr></thead><tbody>${a.map(r=>{const ac=r.resultado==='faltante'?'Ajuste negativo':r.resultado==='sobrante'?'Ajuste positivo':'Investigar';return `<tr><td><strong>${r.sku}</strong></td><td>${r.descripcion||''}</td><td>${r.ubicacion||''}</td><td class="num sist">${r.sistemaU !== null && r.sistemaU !== undefined && !isNaN(r.sistemaU) ? Number(r.sistemaU) : "—"}</td><td class="num">${fmt(r.contadoU)}</td><td class="num ${r.diferencia>0?'diff-neg':'diff-pos'}">${(r.diferencia>0?'+':'')+fmt(r.diferencia)}</td><td>${ac}</td><td>${r.observaciones||''}</td></tr>`;}).join('')}</tbody>`;
 }
 
 function buildWB(data, sn) { const wb = XLSX.utils.book_new(); const ws = XLSX.utils.json_to_sheet(data); XLSX.utils.book_append_sheet(wb, ws, sn); return wb; }
