@@ -808,11 +808,12 @@ function ejecutarControl() {
     let dif = null, ex = null, res = 'no_contado';
     if (s && f) {
       dif = (sU || 0) - (cU || 0);
-      ex = sU > 0 ? 1 - Math.abs(dif) / sU : (cU === 0 ? 1 : null);
+      ex = sU > 0 ? 1 - Math.abs(dif) / sU : (cU === 0 ? 1 : 0);
       if (Math.abs(dif) <= umbral) res = 'ok';
       else if (dif > 0) res = 'faltante';
       else res = 'sobrante';
-    } else if (!s && f) { res = 'solo_fisico'; dif = -cU; }
+    } else if (!s && f) { res = 'solo_fisico'; dif = -cU; ex = 0; }
+    else if (s && !f) { ex = 0; }
     cruce.push({ sku, ubicacion: ubi, sistemaU: sU, contadoU: cU, diferencia: dif, exactitud: ex, resultado: res,
       lpns: s ? s.lpns : 0, zona: s ? s.zona : '', descripcion: (f && f.descripcion) || (s && s.descripcion) || '',
       estados: s ? Array.from(s.estados).join(', ') : '', observaciones: f ? f.observaciones : '', ajustado: f ? f.ajustado : '' });
@@ -1127,13 +1128,11 @@ function renderFisicoDesglose() {
   data = data.slice().sort((a,b)=>(a.ubi||'').localeCompare(b.ubi||''));
   $('tablaFisicoDesglose').innerHTML = `<thead><tr>
     <th>Ubicación</th><th>SKU</th>
-    <th class="num sist">LPNs</th>
     <th class="num sist">1° Conteo</th><th class="num sist">2° Conteo</th><th class="num sist">3° Conteo</th><th class="num sist">Final</th>
   </tr></thead><tbody>${data.slice(0, 3000).map(r => `
     <tr>
       <td><strong>${r.ubi || '<vacío>'}</strong></td>
       <td><strong>${r.sku || '<vacío>'}</strong></td>
-      <td class="num sist">${fmt(r.lpns)}</td>
       <td class="num sist">${r.c1 !== null ? fmt(r.c1) : '—'}</td>
       <td class="num sist">${r.c2 !== null ? fmt(r.c2) : '—'}</td>
       <td class="num sist">${r.c3 !== null ? fmt(r.c3) : '—'}</td>
