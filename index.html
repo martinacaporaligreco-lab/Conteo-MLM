@@ -1014,18 +1014,63 @@ function renderFisicoDesglose() {
   `;
 
   const cleanN = v => parseFloat(String(v == null ? '' : v).replace(/[^\d.\-]/g, ''));
-  const rows = state.fisicoRaw.map(r => {
+  // Detectar columnas adicionales útiles (LPN y Uds Contadas)
+  const colLPN = findCol([/lpn/i, /c[óo]digo.*lpn/i]);
+  const colUds = findCol([/uds\s*contad/i, /unidades\s*contad/i, /^cantidad$/i]);
+
+  // Paso 1: agrupar por (ubi, SKU, LPN) para detectar recuentos del mismo item
+  const lpnGroups = {};
+  state.fisicoRaw.forEach(r => {
     const sku = normKey(colSKU ? r[colSKU] : '');
     const ubi = normKey(colUbi ? r[colUbi] : '');
-    const desc = colDesc ? (r[colDesc] || '') : '';
+    const lpn = colLPN ? String(r[colLPN] || '').trim() : '';
+    if (!sku && !ubi) return;
+    // Para conteos: priorizar columnas Final/1°/2°/3° si existen, sino Uds Contadas
     const cf = colFinal ? cleanN(r[colFinal]) : NaN;
     const c1 = colC1 ? cleanN(r[colC1]) : NaN;
     const c2 = colC2 ? cleanN(r[colC2]) : NaN;
     const c3 = colC3 ? cleanN(r[colC3]) : NaN;
-    const cf_final = !isNaN(cf) ? cf : (!isNaN(c3) ? c3 : (!isNaN(c2) ? c2 : (isNaN(c1) ? 0 : c1)));
+    const uds = colUds ? cleanN(r[colUds]) : NaN;
     const obs = colObs ? (r[colObs] || '') : '';
-    return { sku, ubi, desc, c1: isNaN(c1) ? null : c1, c2: isNaN(c2) ? null : c2, c3: isNaN(c3) ? null : c3, final: cf_final, obs };
+    const k = ubi + '|' + sku + '|' + lpn;
+    if (!lpnGroups[k]) lpnGroups[k] = { ubi, sku, lpn, counts: [], obs: '' };
+    // Si el archivo tiene columnas 1°/2°/3°/Final, usarlas directo (un row = el LPN entero)
+    if (!isNaN(c1) || !isNaN(c2) || !isNaN(c3) || !isNaN(cf)) {
+      if (!isNaN(c1)) lpnGroups[k].counts.push(c1);
+      if (!isNaN(c2)) lpnGroups[k].counts.push(c2);
+      if (!isNaN(c3)) lpnGroups[k].counts.push(c3);
+      if (!isNaN(cf) && lpnGroups[k].counts.length === 0) lpnGroups[k].counts.push(cf);
+    } else if (!isNaN(uds)) {
+      // Cada row es un conteo del LPN. Si aparece N veces, son N recuentos.
+      lpnGroups[k].counts.push(uds);
+    }
+    if (obs) lpnGroups[k].obs = obs;
   });
+
+  // Paso 2: agregar por (ubi, SKU) — 1°/2°/3° suman a través de LPNs
+  const ubiSkuMap = {};
+  Object.values(lpnGroups).forEach(g => {
+    const k = g.ubi + '|' + g.sku;
+    if (!ubiSkuMap[k]) ubiSkuMap[k] = { ubi: g.ubi, sku: g.sku, c1: 0, c2: 0, c3: 0, finalSum: 0, lpns: 0, obsList: new Set(), has1:false, has2:false, has3:false };
+    const cs = g.counts;
+    const last = cs.length ? cs[cs.length - 1] : 0;
+    if (cs.length >= 1) { ubiSkuMap[k].c1 += cs[0]; ubiSkuMap[k].has1 = true; }
+    if (cs.length >= 2) { ubiSkuMap[k].c2 += cs[1]; ubiSkuMap[k].has2 = true; }
+    if (cs.length >= 3) { ubiSkuMap[k].c3 += cs[2]; ubiSkuMap[k].has3 = true; }
+    ubiSkuMap[k].finalSum += last;
+    ubiSkuMap[k].lpns += 1;
+    if (g.obs) ubiSkuMap[k].obsList.add(g.obs);
+  });
+  const rows = Object.values(ubiSkuMap).map(g => ({
+    sku: g.sku,
+    ubi: g.ubi,
+    c1: g.has1 ? g.c1 : null,
+    c2: g.has2 ? g.c2 : null,
+    c3: g.has3 ? g.c3 : null,
+    final: g.finalSum,
+    lpns: g.lpns,
+    obs: Array.from(g.obsList).join('; ')
+  }));
   const totUnid = rows.reduce((a, r) => a + (r.final || 0), 0);
   const ubisUnicas = new Set(rows.map(r => r.ubi).filter(u => u)).size;
   const skusUnicos = new Set(rows.map(r => r.sku).filter(s => s)).size;
@@ -1038,18 +1083,19 @@ function renderFisicoDesglose() {
   let data = rows;
   if (q) data = data.filter(r => r.sku.includes(q) || r.ubi.includes(q));
   $('tablaFisicoDesglose').innerHTML = `<thead><tr>
-    <th>Ubicación</th><th>SKU</th><th>Descripción</th>
-    <th class="num">1° Conteo</th><th class="num">2° Conteo</th><th class="num">3° Conteo</th><th class="num">Final</th>
+    <th>Ubicación</th><th>SKU</th>
+    <th class="num sist">LPNs</th>
+    <th class="num sist">1° Conteo</th><th class="num sist">2° Conteo</th><th class="num sist">3° Conteo</th><th class="num sist">Final</th>
     <th>Observaciones</th>
   </tr></thead><tbody>${data.slice(0, 3000).map(r => `
     <tr>
       <td><strong>${r.ubi || '<vacío>'}</strong></td>
       <td><strong>${r.sku || '<vacío>'}</strong></td>
-      <td>${r.desc}</td>
-      <td class="num">${r.c1 !== null ? fmt(r.c1) : '—'}</td>
-      <td class="num">${r.c2 !== null ? fmt(r.c2) : '—'}</td>
-      <td class="num">${r.c3 !== null ? fmt(r.c3) : '—'}</td>
-      <td class="num"><strong>${fmt(r.final)}</strong></td>
+      <td class="num sist">${fmt(r.lpns)}</td>
+      <td class="num sist">${r.c1 !== null ? fmt(r.c1) : '—'}</td>
+      <td class="num sist">${r.c2 !== null ? fmt(r.c2) : '—'}</td>
+      <td class="num sist">${r.c3 !== null ? fmt(r.c3) : '—'}</td>
+      <td class="num sist"><strong>${fmt(r.final)}</strong></td>
       <td>${r.obs}</td>
     </tr>`).join('')}</tbody>`;
 }
