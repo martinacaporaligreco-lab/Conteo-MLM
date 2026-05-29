@@ -1625,8 +1625,35 @@ function buildWB(data, sn) { const wb = XLSX.utils.book_new(); const ws = XLSX.u
 function expSuf() { return $('cfgQuarter').value + '_' + $('cfgYear').value + '_' + new Date().toISOString().slice(0,10); }
 function exportCruce() {
   if (!state.cruce) { toast('Ejecutá primero','err'); return; }
-  const d = state.cruce.map(r=>({SKU:r.sku,Descripción:r.descripcion,Ubicación:r.ubicacion,Zona:r.zona,LPNs:r.lpns,Estados:r.estados,'Unid. Sistema':r.sistemaU,'Unid. Contadas':r.contadoU,Diferencia:r.diferencia,Exactitud:r.exactitud,Resultado:r.resultado,Observaciones:r.observaciones,Ajustado:r.ajustado}));
-  XLSX.writeFile(buildWB(d,'Cruce'), 'Conteo_MLM_Cruce_'+expSuf()+'.xlsx');
+  const RES_LABEL = { ok: 'OK', faltante: 'FALTANTE', sobrante: 'SOBRANTE', no_contado: 'NO CONTADO', solo_fisico: 'SOLO FÍSICO' };
+  const sorted = state.cruce.slice().sort((a,b)=>(a.ubicacion||'').localeCompare(b.ubicacion||'') || (a.sku||'').localeCompare(b.sku||''));
+  const d = sorted.map(r=>({
+    'SKU': r.sku || '',
+    'Ubicación': r.ubicacion || '',
+    'Sistema': r.sistemaU !== null && r.sistemaU !== undefined ? r.sistemaU : '',
+    'Contado': r.contadoU !== null && r.contadoU !== undefined ? r.contadoU : '',
+    'Diferencia': r.diferencia !== null && r.diferencia !== undefined ? r.diferencia : '',
+    'Exactitud': r.exactitud !== null && r.exactitud !== undefined ? Math.round(r.exactitud * 1000) / 10 + '%' : '',
+    'Resultado': RES_LABEL[r.resultado] || r.resultado || ''
+  }));
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.json_to_sheet(d);
+  // Anchos de columna
+  ws['!cols'] = [
+    { wch: 10 },  // SKU
+    { wch: 22 },  // Ubicación
+    { wch: 12 },  // Sistema
+    { wch: 12 },  // Contado
+    { wch: 12 },  // Diferencia
+    { wch: 11 },  // Exactitud
+    { wch: 14 }   // Resultado
+  ];
+  // Auto-filter en todo el rango
+  if (d.length > 0) ws['!autofilter'] = { ref: ws['!ref'] };
+  // Freeze header row
+  ws['!freeze'] = { xSplit: 0, ySplit: 1 };
+  XLSX.utils.book_append_sheet(wb, ws, 'Cruce');
+  XLSX.writeFile(wb, 'Cruce_Sistema_vs_Fisico_'+expSuf()+'.xlsx');
   toast('Cruce exportado: '+d.length+' filas','ok');
 }
 function exportHallazgos() {
