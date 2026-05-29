@@ -915,8 +915,15 @@ function buildInventarioCompleto() {
 }
 
 
-function toggleInvSort(mode) {
-  state.invSortMode = mode;
+function toggleInvSort(col) {
+  if (!state.invSort) state.invSort = { col: 'ubi', dir: 'asc' };
+  if (state.invSort.col === col) {
+    state.invSort.dir = state.invSort.dir === 'asc' ? 'desc' : 'asc';
+  } else {
+    state.invSort.col = col;
+    // Numéricas arrancan en desc (mayor a menor), texto en asc (A→Z)
+    state.invSort.dir = (col === 'ubi' || col === 'sku' || col === 'estado') ? 'asc' : 'desc';
+  }
   renderInventarioCompleto();
 }
 
@@ -936,25 +943,39 @@ function renderInventarioCompleto() {
   if (fo === 'terceros') data = data.filter(r => r.contadoPor === 'TERCEROS');
   else if (fo === 'sistema') data = data.filter(r => r.contadoPor === 'SISTEMA');
   else if (fo === 'sin_conteo') data = data.filter(r => r.contadoPor === 'SIN_CONTEO');
-  // Sort: si state.invSortMode === 'fisico', con datos arriba; sino alfabético
-  const sortMode = state.invSortMode || 'ubi';
-  if (sortMode === 'fisico') {
-    data = data.slice().sort((a,b)=>{
-      const aHas = a.contadoU !== null ? 1 : 0;
-      const bHas = b.contadoU !== null ? 1 : 0;
-      if (aHas !== bHas) return bHas - aHas;  // con datos primero
-      // Dentro de los que tienen datos, ordenar por cantidad descendente
-      if (aHas && bHas) return (b.contadoU||0) - (a.contadoU||0);
-      // Dentro de los sin datos, alfabético
-      return (a.ubicacion||'').localeCompare(b.ubicacion||'');
-    });
-  } else {
-    data = data.slice().sort((a,b)=>(a.ubicacion||'').localeCompare(b.ubicacion||''));
-  }
+  // Sort por columna con dirección
+  const sort = state.invSort || { col: 'ubi', dir: 'asc' };
+  const dirMul = sort.dir === 'asc' ? 1 : -1;
+  const cmpStr = (a, b) => (a||'').localeCompare(b||'') * dirMul;
+  const cmpNum = (a, b) => {
+    const an = a === null || a === undefined ? null : Number(a);
+    const bn = b === null || b === undefined ? null : Number(b);
+    // null al final (en ambas direcciones, lo que no tiene datos abajo)
+    if (an === null && bn === null) return 0;
+    if (an === null) return 1;
+    if (bn === null) return -1;
+    return (an - bn) * dirMul;
+  };
+  data = data.slice().sort((a, b) => {
+    switch (sort.col) {
+      case 'ubi': return cmpStr(a.ubicacion, b.ubicacion) || cmpStr(a.sku, b.sku);
+      case 'sku': return cmpStr(a.sku, b.sku) || cmpStr(a.ubicacion, b.ubicacion);
+      case 'sistemico': return cmpNum(a.sistemaU, b.sistemaU) || cmpStr(a.ubicacion, b.ubicacion);
+      case 'fisico': return cmpNum(a.contadoU, b.contadoU) || cmpStr(a.ubicacion, b.ubicacion);
+      case 'diferencia': return cmpNum(a.diferencia, b.diferencia) || cmpStr(a.ubicacion, b.ubicacion);
+      case 'estado': return cmpStr(a.resultado, b.resultado) || cmpStr(a.ubicacion, b.ubicacion);
+      default: return cmpStr(a.ubicacion, b.ubicacion);
+    }
+  });
   $('tablaInvCompleto').innerHTML = `<thead><tr>
-    <th onclick="toggleInvSort('ubi')" style="cursor:pointer">Ubicación ${sortMode==='ubi'?'▲':''}</th><th>SKU</th>
-    <th class="num sist">Sistémico</th><th class="num sist" onclick="toggleInvSort('fisico')" style="cursor:pointer">Físico ${sortMode==='fisico'?'▼':'⇅'}</th><th class="num sist">Diferencia</th>
-    <th>Estado</th>
+    ${(() => { const s = state.invSort || {col:'ubi',dir:'asc'}; const arrow = c => s.col===c ? (s.dir==='asc'?' ▲':' ▼') : ' ⇅'; return `
+    <th onclick="toggleInvSort('ubi')" style="cursor:pointer;user-select:none">Ubicación${arrow('ubi')}</th>
+    <th onclick="toggleInvSort('sku')" style="cursor:pointer;user-select:none">SKU${arrow('sku')}</th>
+    <th class="num sist" onclick="toggleInvSort('sistemico')" style="cursor:pointer;user-select:none">Sistémico${arrow('sistemico')}</th>
+    <th class="num sist" onclick="toggleInvSort('fisico')" style="cursor:pointer;user-select:none">Físico${arrow('fisico')}</th>
+    <th class="num sist" onclick="toggleInvSort('diferencia')" style="cursor:pointer;user-select:none">Diferencia${arrow('diferencia')}</th>
+    <th onclick="toggleInvSort('estado')" style="cursor:pointer;user-select:none">Estado${arrow('estado')}</th>
+    `; })()}
   </tr></thead><tbody>${data.slice(0, 3000).map(r => `
     <tr>
       <td><strong>${r.ubicacion}</strong></td>
