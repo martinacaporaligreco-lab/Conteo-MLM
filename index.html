@@ -413,8 +413,18 @@ function ghClearToken() { localStorage.removeItem('gh_pat_conteo_mlm'); }
 async function ghLoad(key) {
   if (!ghConfigured()) return null;
   try {
+    // Try gzipped version first
+    const urlGz = `https://raw.githubusercontent.com/${GH_CONFIG.owner}/${GH_CONFIG.repo}/${GH_CONFIG.branch}/data/${key}.json.gz?t=${Date.now()}`;
+    let r = await fetch(urlGz, { cache: 'no-store' });
+    if (r.ok) {
+      const buf = await r.arrayBuffer();
+      const stream = new Blob([buf]).stream().pipeThrough(new DecompressionStream('gzip'));
+      const text = await new Response(stream).text();
+      return JSON.parse(text);
+    }
+    // Fallback: legacy plain .json
     const url = `https://raw.githubusercontent.com/${GH_CONFIG.owner}/${GH_CONFIG.repo}/${GH_CONFIG.branch}/data/${key}.json?t=${Date.now()}`;
-    const r = await fetch(url, { cache: 'no-store' });
+    r = await fetch(url, { cache: 'no-store' });
     if (!r.ok) return null;
     return await r.json();
   } catch(e) { console.warn('ghLoad fail', key, e); return null; }
@@ -428,8 +438,9 @@ async function ghSave(key, value) {
     if (!token) return { ok: false, reason: 'no_token' };
   }
   try {
-    const path = `data/${key}.json`;
+    const path = `data/${key}.json.gz`;
     const apiUrl = `https://api.github.com/repos/${GH_CONFIG.owner}/${GH_CONFIG.repo}/contents/${path}`;
+    // Get SHA of existing file (for update)
     let sha = null;
     try {
       const r = await fetch(apiUrl + `?ref=${GH_CONFIG.branch}`, { headers: { Authorization: `token ${token}` } });
@@ -440,15 +451,28 @@ async function ghSave(key, value) {
         return { ok: false, reason: 'bad_token' };
       }
     } catch(e) {}
+    // Serialize + gzip
     const json = JSON.stringify(value);
-    // Tamaño máximo de la GitHub Contents API ~100MB pero recomienda <1MB
-    if (json.length > 90 * 1024 * 1024) {
-      toast(`Archivo ${key} demasiado grande (${(json.length/1024/1024).toFixed(1)}MB)`, 'err');
+    const compressed = await new Response(
+      new Blob([json]).stream().pipeThrough(new CompressionStream('gzip'))
+    ).arrayBuffer();
+    const compSize = compressed.byteLength;
+    console.log(`ghSave ${key}: JSON ${(json.length/1024/1024).toFixed(1)}MB → gzip ${(compSize/1024/1024).toFixed(1)}MB`);
+    if (compSize > 95 * 1024 * 1024) {
+      toast(`${key} sigue siendo muy grande tras comprimir (${(compSize/1024/1024).toFixed(0)}MB > 95MB)`, 'err');
       return { ok: false, reason: 'too_big' };
     }
-    const b64 = btoa(unescape(encodeURIComponent(json)));
+    // Convert ArrayBuffer to base64 in chunks (atob/btoa limited)
+    let b64 = '';
+    const bytes = new Uint8Array(compressed);
+    const CHUNK = 32768;
+    let bin = '';
+    for (let i = 0; i < bytes.length; i += CHUNK) {
+      bin += String.fromCharCode.apply(null, bytes.subarray(i, i+CHUNK));
+    }
+    b64 = btoa(bin);
     const body = {
-      message: `update ${key} — ${new Date().toLocaleString('es-MX')}`,
+      message: `update ${key} (gzip) — ${new Date().toLocaleString('es-MX')}`,
       content: b64,
       branch: GH_CONFIG.branch
     };
