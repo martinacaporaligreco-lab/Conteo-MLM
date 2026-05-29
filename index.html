@@ -75,10 +75,8 @@ td { padding: 9px 12px; border-bottom: 1px solid #eef1f6; color: #1a2540; }
 tbody tr:hover { background: #f8faff; }
 .num { text-align: right; font-variant-numeric: tabular-nums; font-family: ui-monospace, monospace; }
 .num.sist { text-align: center; }
-.row-ok td { background: #e8f7ec !important; }
-.row-dif td { background: #fde8e8 !important; }
-.row-ok td:first-child, .row-ok td:last-child { background: #d4f1dc !important; }
-.row-dif td:first-child, .row-dif td:last-child { background: #f8d4d4 !important; }
+.ubi-ok { color: #1e7e3b; font-weight: 700; }
+.ubi-dif { color: #c0392b; font-weight: 700; }
 ::-webkit-scrollbar-button { display: none; }
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-thumb { background: #cdd5e0; border-radius: 4px; }
@@ -1577,7 +1575,7 @@ function renderCruce() {
     }
   });
   const cArr = c => cs.col === c ? (cs.dir === 'asc' ? ' ▲' : ' ▼') : ' ⇅';
-  $('tablaCruce').innerHTML = `<thead><tr><th onclick="toggleCruceSort('sku')" style="cursor:pointer;user-select:none">SKU${cArr('sku')}</th><th onclick="toggleCruceSort('ubi')" style="cursor:pointer;user-select:none">Ubicación${cArr('ubi')}</th><th class="num sist" onclick="toggleCruceSort('sistema')" style="cursor:pointer;user-select:none">Sistema${cArr('sistema')}</th><th class="num sist" onclick="toggleCruceSort('contado')" style="cursor:pointer;user-select:none">Contado${cArr('contado')}</th><th class="num sist" onclick="toggleCruceSort('diferencia')" style="cursor:pointer;user-select:none">Diferencia${cArr('diferencia')}</th><th class="num sist" onclick="toggleCruceSort('exactitud')" style="cursor:pointer;user-select:none">Exactitud${cArr('exactitud')}</th><th onclick="toggleCruceSort('resultado')" style="cursor:pointer;user-select:none">Resultado${cArr('resultado')}</th></tr></thead><tbody>${d.slice(0,2000).map(r=>`<tr class="${r.resultado==='ok' ? 'row-ok' : (r.resultado==='faltante' || r.resultado==='sobrante' || r.resultado==='solo_fisico' || r.resultado==='no_contado') ? 'row-dif' : ''}"><td><strong>${r.sku||''}</strong></td><td>${r.ubicacion||''}</td><td class="num sist">${r.sistemaU!==null?fmt(r.sistemaU):'—'}</td><td class="num sist">${r.contadoU!==null?fmt(r.contadoU):'—'}</td><td class="num sist ${r.diferencia>0?'diff-neg':r.diferencia<0?'diff-pos':'diff-zero'}">${r.diferencia===null?'—':(r.diferencia>0?'+':'')+fmt(r.diferencia)}</td><td class="num sist">${r.exactitud!==null?fmtPct(r.exactitud):'—'}</td><td>${badgeRes(r.resultado)}</td></tr>`).join('')}</tbody>`;
+  $('tablaCruce').innerHTML = `<thead><tr><th onclick="toggleCruceSort('sku')" style="cursor:pointer;user-select:none">SKU${cArr('sku')}</th><th onclick="toggleCruceSort('ubi')" style="cursor:pointer;user-select:none">Ubicación${cArr('ubi')}</th><th class="num sist" onclick="toggleCruceSort('sistema')" style="cursor:pointer;user-select:none">Sistema${cArr('sistema')}</th><th class="num sist" onclick="toggleCruceSort('contado')" style="cursor:pointer;user-select:none">Contado${cArr('contado')}</th><th class="num sist" onclick="toggleCruceSort('diferencia')" style="cursor:pointer;user-select:none">Diferencia${cArr('diferencia')}</th><th class="num sist" onclick="toggleCruceSort('exactitud')" style="cursor:pointer;user-select:none">Exactitud${cArr('exactitud')}</th><th onclick="toggleCruceSort('resultado')" style="cursor:pointer;user-select:none">Resultado${cArr('resultado')}</th></tr></thead><tbody>${d.slice(0,2000).map(r=>`<tr><td><strong>${r.sku||''}</strong></td><td class="${r.resultado==='ok' ? 'ubi-ok' : (r.resultado==='faltante' || r.resultado==='sobrante' || r.resultado==='solo_fisico' || r.resultado==='no_contado') ? 'ubi-dif' : ''}">${r.ubicacion||''}</td><td class="num sist">${r.sistemaU!==null?fmt(r.sistemaU):'—'}</td><td class="num sist">${r.contadoU!==null?fmt(r.contadoU):'—'}</td><td class="num sist ${r.diferencia>0?'diff-neg':r.diferencia<0?'diff-pos':'diff-zero'}">${r.diferencia===null?'—':(r.diferencia>0?'+':'')+fmt(r.diferencia)}</td><td class="num sist">${r.exactitud!==null?fmtPct(r.exactitud):'—'}</td><td>${badgeRes(r.resultado)}</td></tr>`).join('')}</tbody>`;
 }
 
 function renderHallazgos() {
