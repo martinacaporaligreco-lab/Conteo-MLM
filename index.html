@@ -79,7 +79,7 @@ tbody tr:hover { background: #f8faff; }
 .ubi-dif { color: #c0392b; font-weight: 700; }
 .ubi-nc { color: #1a1a1a; font-weight: 600; }
 .diff-real { color: #c0392b !important; font-weight: 700; }
-.diff-zero { color: #1e7e3b !important; font-weight: 700; }
+.diff-zero { color: #1a1a1a !important; font-weight: 700; }
 .diff-nc { color: #1a1a1a !important; font-weight: 600; }
 .chip { padding: 5px 12px; border-radius: 16px; background: #eef2f7; color: #1a2540; font-size: 12px; font-weight: 600; cursor: pointer; user-select: none; border: 1px solid transparent; transition: all .15s; }
 .chip:hover { background: #dfe6ef; }
@@ -834,13 +834,14 @@ function ejecutarControl() {
     const cU = f ? f.contadoFinal : null;
     let dif = null, ex = null, res = 'no_contado';
     if (s && f) {
-      dif = (sU || 0) - (cU || 0);
+      // Convención: contado − sistema. Positivo = sobrante (físico > sistema), negativo = faltante.
+      dif = (cU || 0) - (sU || 0);
       ex = sU > 0 ? 1 - Math.abs(dif) / sU : (cU === 0 ? 1 : 0);
       if (Math.abs(dif) <= umbral) res = 'ok';
-      else if (dif > 0) res = 'faltante';
-      else res = 'sobrante';
-    } else if (!s && f) { res = 'solo_fisico'; dif = -cU; ex = 0; }
-    else if (s && !f) { ex = 0; }
+      else if (dif > 0) res = 'sobrante';
+      else res = 'faltante';
+    } else if (!s && f) { res = 'solo_fisico'; dif = cU; ex = 0; }
+    else if (s && !f) { ex = 0; dif = -sU; }
     cruce.push({ sku, ubicacion: ubi, sistemaU: sU, contadoU: cU, diferencia: dif, exactitud: ex, resultado: res,
       lpns: s ? s.lpns : 0, zona: s ? s.zona : '', descripcion: (f && f.descripcion) || (s && s.descripcion) || '',
       estados: s ? Array.from(s.estados).join(', ') : '', observaciones: f ? f.observaciones : '', ajustado: f ? f.ajustado : '' });
