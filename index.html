@@ -77,7 +77,10 @@ tbody tr:hover { background: #f8faff; }
 .num.sist { text-align: center; }
 .ubi-ok { color: #1e7e3b; font-weight: 700; }
 .ubi-dif { color: #c0392b; font-weight: 700; }
-.ubi-nc { color: #6c757d; font-weight: 600; }
+.ubi-nc { color: #1a1a1a; font-weight: 600; }
+.diff-real { color: #c0392b !important; font-weight: 700; }
+.diff-zero { color: #1e7e3b !important; font-weight: 700; }
+.diff-nc { color: #1a1a1a !important; font-weight: 600; }
 .chip { padding: 5px 12px; border-radius: 16px; background: #eef2f7; color: #1a2540; font-size: 12px; font-weight: 600; cursor: pointer; user-select: none; border: 1px solid transparent; transition: all .15s; }
 .chip:hover { background: #dfe6ef; }
 .chip.active { background: #1e3a5f; color: #fff; border-color: #1e3a5f; }
@@ -1007,7 +1010,7 @@ function renderInventarioCompleto() {
       <td><strong>${r.sku}</strong></td>
       <td class="num sist">${fmt(r.sistemaU)}</td>
       <td class="num sist">${r.contadoU !== null ? fmt(r.contadoU) : '<span style="color:#b0b8c5">—</span>'}</td>
-      <td class="num sist ${r.diferencia === null ? '' : r.diferencia > 0 ? 'diff-neg' : r.diferencia < 0 ? 'diff-pos' : 'diff-zero'}">${r.diferencia === null ? '—' : (r.diferencia > 0 ? '+' : '') + fmt(r.diferencia)}</td>
+      <td class="num sist ${r.resultado === 'ok' ? 'diff-zero' : r.resultado === 'no_contado' ? 'diff-nc' : (r.resultado === 'faltante' || r.resultado === 'sobrante' || r.resultado === 'solo_fisico') ? 'diff-real' : ''}">${r.diferencia === null ? '—' : (r.diferencia > 0 ? '+' : '') + fmt(r.diferencia)}</td>
       <td>${r.resultado === 'vacia_master' ? '<span class="badge badge-missing">VACÍA</span>' : badgeRes(r.resultado)}</td>
     </tr>`).join('')}</tbody>`;
 }
@@ -1571,7 +1574,7 @@ function renderTopDif() {
     return;
   }
   const RES_LABEL = { ok: 'OK', faltante: 'FALTANTE', sobrante: 'SOBRANTE', no_contado: 'NO CONTADO', solo_fisico: 'SOLO FÍSICO' };
-  document.getElementById('tablaTopDif').innerHTML = `<thead><tr><th>#</th><th>SKU</th><th>Ubicación</th><th class="num sist">Sistema</th><th class="num sist">Contado</th><th class="num sist">Diferencia</th><th>Resultado</th></tr></thead><tbody>${top.map((r, i) => `<tr><td><strong>${i + 1}</strong></td><td><strong>${r.sku || ''}</strong></td><td class="ubi-dif">${r.ubicacion || ''}</td><td class="num sist">${r.sistemaU !== null ? fmt(r.sistemaU) : 0}</td><td class="num sist">${r.contadoU !== null ? fmt(r.contadoU) : 0}</td><td class="num sist diff-neg">${(r.diferencia > 0 ? '+' : '') + fmt(r.diferencia)}</td><td>${badgeRes(r.resultado)}</td></tr>`).join('')}</tbody>`;
+  document.getElementById('tablaTopDif').innerHTML = `<thead><tr><th>#</th><th>SKU</th><th>Ubicación</th><th class="num sist">Sistema</th><th class="num sist">Contado</th><th class="num sist">Diferencia</th><th>Resultado</th></tr></thead><tbody>${top.map((r, i) => `<tr><td><strong>${i + 1}</strong></td><td><strong>${r.sku || ''}</strong></td><td class="ubi-dif">${r.ubicacion || ''}</td><td class="num sist">${r.sistemaU !== null ? fmt(r.sistemaU) : 0}</td><td class="num sist">${r.contadoU !== null ? fmt(r.contadoU) : 0}</td><td class="num sist diff-real">${(r.diferencia > 0 ? '+' : '') + fmt(r.diferencia)}</td><td>${badgeRes(r.resultado)}</td></tr>`).join('')}</tbody>`;
 }
 
 function renderResSKU() {
@@ -1587,7 +1590,7 @@ function renderResSKU() {
     else if (r.diferencia !== null && r.diferencia !== 0) bySku[k].ubisDif += 1;
   });
   const list = Object.values(bySku).sort((a, b) => Math.abs(b.diff) - Math.abs(a.diff));
-  document.getElementById('tablaResSKU').innerHTML = `<thead><tr><th>SKU</th><th class="num sist">Ubic. OK</th><th class="num sist">Ubic. con dif</th><th class="num sist">Sistema</th><th class="num sist">Contado</th><th class="num sist">Desvío neto</th></tr></thead><tbody>${list.map(s => `<tr><td><strong>${s.sku}</strong></td><td class="num sist">${fmt(s.ubisOk)}</td><td class="num sist ${s.ubisDif > 0 ? 'ubi-dif' : ''}">${fmt(s.ubisDif)}</td><td class="num sist">${fmt(s.sistema)}</td><td class="num sist">${fmt(s.contado)}</td><td class="num sist ${s.diff > 0 ? 'diff-neg' : s.diff < 0 ? 'diff-pos' : 'diff-zero'}">${(s.diff > 0 ? '+' : '') + fmt(s.diff)}</td></tr>`).join('')}</tbody>`;
+  document.getElementById('tablaResSKU').innerHTML = `<thead><tr><th>SKU</th><th class="num sist">Ubic. OK</th><th class="num sist">Ubic. con dif</th><th class="num sist">Sistema</th><th class="num sist">Contado</th><th class="num sist">Desvío neto</th></tr></thead><tbody>${list.map(s => `<tr><td><strong>${s.sku}</strong></td><td class="num sist">${fmt(s.ubisOk)}</td><td class="num sist ${s.ubisDif > 0 ? 'ubi-dif' : ''}">${fmt(s.ubisDif)}</td><td class="num sist">${fmt(s.sistema)}</td><td class="num sist">${fmt(s.contado)}</td><td class="num sist ${s.diff === 0 ? 'diff-zero' : 'diff-real'}">${(s.diff > 0 ? '+' : '') + fmt(s.diff)}</td></tr>`).join('')}</tbody>`;
 }
 
 function toggleCruceSort(col) {
@@ -1636,7 +1639,7 @@ function renderCruce() {
     }
   });
   const cArr = c => cs.col === c ? (cs.dir === 'asc' ? ' ▲' : ' ▼') : ' ⇅';
-  $('tablaCruce').innerHTML = `<thead><tr><th onclick="toggleCruceSort('sku')" style="cursor:pointer;user-select:none">SKU${cArr('sku')}</th><th onclick="toggleCruceSort('ubi')" style="cursor:pointer;user-select:none">Ubicación${cArr('ubi')}</th><th class="num sist" onclick="toggleCruceSort('sistema')" style="cursor:pointer;user-select:none">Sistema${cArr('sistema')}</th><th class="num sist" onclick="toggleCruceSort('contado')" style="cursor:pointer;user-select:none">Contado${cArr('contado')}</th><th class="num sist" onclick="toggleCruceSort('diferencia')" style="cursor:pointer;user-select:none">Diferencia${cArr('diferencia')}</th><th class="num sist" onclick="toggleCruceSort('exactitud')" style="cursor:pointer;user-select:none">Exactitud${cArr('exactitud')}</th><th onclick="toggleCruceSort('resultado')" style="cursor:pointer;user-select:none">Resultado${cArr('resultado')}</th></tr></thead><tbody>${d.slice(0,2000).map(r=>`<tr><td><strong>${r.sku||''}</strong></td><td class="${r.resultado==='ok' ? 'ubi-ok' : r.resultado==='no_contado' ? 'ubi-nc' : (r.resultado==='faltante' || r.resultado==='sobrante' || r.resultado==='solo_fisico') ? 'ubi-dif' : ''}">${r.ubicacion||''}</td><td class="num sist">${r.sistemaU!==null?fmt(r.sistemaU):'—'}</td><td class="num sist">${r.contadoU!==null?fmt(r.contadoU):'—'}</td><td class="num sist ${r.diferencia>0?'diff-neg':r.diferencia<0?'diff-pos':'diff-zero'}">${r.diferencia===null?'—':(r.diferencia>0?'+':'')+fmt(r.diferencia)}</td><td class="num sist">${r.exactitud!==null?fmtPct(r.exactitud):'—'}</td><td>${badgeRes(r.resultado)}</td></tr>`).join('')}</tbody>`;
+  $('tablaCruce').innerHTML = `<thead><tr><th onclick="toggleCruceSort('sku')" style="cursor:pointer;user-select:none">SKU${cArr('sku')}</th><th onclick="toggleCruceSort('ubi')" style="cursor:pointer;user-select:none">Ubicación${cArr('ubi')}</th><th class="num sist" onclick="toggleCruceSort('sistema')" style="cursor:pointer;user-select:none">Sistema${cArr('sistema')}</th><th class="num sist" onclick="toggleCruceSort('contado')" style="cursor:pointer;user-select:none">Contado${cArr('contado')}</th><th class="num sist" onclick="toggleCruceSort('diferencia')" style="cursor:pointer;user-select:none">Diferencia${cArr('diferencia')}</th><th class="num sist" onclick="toggleCruceSort('exactitud')" style="cursor:pointer;user-select:none">Exactitud${cArr('exactitud')}</th><th onclick="toggleCruceSort('resultado')" style="cursor:pointer;user-select:none">Resultado${cArr('resultado')}</th></tr></thead><tbody>${d.slice(0,2000).map(r=>`<tr><td><strong>${r.sku||''}</strong></td><td class="${r.resultado==='ok' ? 'ubi-ok' : r.resultado==='no_contado' ? 'ubi-nc' : (r.resultado==='faltante' || r.resultado==='sobrante' || r.resultado==='solo_fisico') ? 'ubi-dif' : ''}">${r.ubicacion||''}</td><td class="num sist">${r.sistemaU!==null?fmt(r.sistemaU):'—'}</td><td class="num sist">${r.contadoU!==null?fmt(r.contadoU):'—'}</td><td class="num sist ${r.resultado==='ok'?'diff-zero':r.resultado==='no_contado'?'diff-nc':(r.resultado==='faltante'||r.resultado==='sobrante'||r.resultado==='solo_fisico')?'diff-real':''}">${r.diferencia===null?'—':(r.diferencia>0?'+':'')+fmt(r.diferencia)}</td><td class="num sist">${r.exactitud!==null?fmtPct(r.exactitud):'—'}</td><td>${badgeRes(r.resultado)}</td></tr>`).join('')}</tbody>`;
 }
 
 function renderHallazgos() {
