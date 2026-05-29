@@ -1025,6 +1025,9 @@ function renderFisicoDesglose() {
     const ubi = normKey(colUbi ? r[colUbi] : '');
     const lpn = colLPN ? String(r[colLPN] || '').trim() : '';
     if (!sku && !ubi) return;
+    // Skip rows que son placeholders sin SKU ni unidades (el archivo trae ubicaciones vacías)
+    const _uds = colUds ? cleanN(r[colUds]) : NaN;
+    if (!sku && (isNaN(_uds) || _uds === 0)) return;
     // Para conteos: priorizar columnas Final/1°/2°/3° si existen, sino Uds Contadas
     const cf = colFinal ? cleanN(r[colFinal]) : NaN;
     const c1 = colC1 ? cleanN(r[colC1]) : NaN;
