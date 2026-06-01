@@ -805,7 +805,19 @@ setupDrop('card-fisico', procesarXLSX);
 setupDrop('card-master', procesarMaster);
 window.addEventListener('error', e => { toast('Error JS: ' + (e.message || 'desconocido'), 'err'); });
 
-function checkReady() { if (state.sistemaRaw && state.fisicoRaw) { $('btnExec').classList.add('ready'); $('execMsg').textContent = 'Listo para ejecutar el cruce.'; } }
+function checkReady() {
+  const btn = $('btnExec');
+  if (state.sistemaRaw && state.fisicoRaw) {
+    btn.classList.add('ready');
+    $('execMsg').textContent = 'Listo para ejecutar el cruce.';
+  } else if (state.sistemaRaw) {
+    btn.classList.add('ready');
+    $('execMsg').textContent = 'Listo · ejecución solo con Stock Sistémico (sin Conteo Físico).';
+  } else if (state.fisicoRaw) {
+    btn.classList.remove('ready');
+    $('execMsg').textContent = 'Falta Stock Sistémico para ejecutar.';
+  }
+}
 
 function resetAll(ev) {
   const btn = ev && ev.currentTarget;
@@ -824,7 +836,9 @@ function resetAll(ev) {
 }
 
 function ejecutarControl() {
-  if (!state.sistemaRaw || !state.fisicoRaw) { toast('Faltan archivos', 'err'); return; }
+  if (!state.sistemaRaw) { toast('Falta el Stock Sistémico', 'err'); return; }
+  // Físico es opcional: si no está cargado, tratamos como vacío (solo se ve el sistémico)
+  if (!state.fisicoRaw) { state.fisicoRaw = []; }
   $('execMsg').textContent = 'Procesando...';
   const sistemaAgg = {};
   const sfc = { total: 0, usado: 0 };
@@ -1104,7 +1118,7 @@ function toggleFisSort(col) {
 }
 
 function renderFisicoDesglose() {
-  if (!state.fisicoRaw) return;
+  if (!state.fisicoRaw || !state.fisicoRaw.length) return;
   const q = (($('searchFis') && $('searchFis').value) || '').toUpperCase().trim();
 
   // === DIAGNÓSTICO: detectar columnas dinámicamente ===
@@ -1241,7 +1255,7 @@ function renderFisicoDesglose() {
 }
 
 function exportFisicoDesglose() {
-  if (!state.fisicoRaw) { toast('Cargá el físico primero', 'err'); return; }
+  if (!state.fisicoRaw || !state.fisicoRaw.length) { toast('Cargá el físico primero', 'err'); return; }
   const data = state.fisicoRaw.map(r => {
     const sku = normKey(r['SKU / Código'] || r['SKU Código'] || r['SKU'] || r['Código'] || r['Codigo'] || r['Producto'] || r['PRODUCTO']);
     const ubi = normKey(r['Ubicación / Posición'] || r['Ubicación'] || r['Ubicacion'] || r['UBICACION'] || r['Posición'] || r['Posicion']);
@@ -2128,6 +2142,8 @@ async function borrarFisicoGH(ev) {
     if (fi) fi.value = '';
     const btnE = document.getElementById('btnExec');
     if (btnE) btnE.classList.remove('ready');
+    // Recalcular si se puede ejecutar (con solo el sistémico ahora se permite)
+    try { checkReady(); } catch(e) {}
     toast('Conteo Físico eliminado · local' + ghMsg, 'ok');
   } catch (e) {
     console.error('borrarFisicoGH', e);
