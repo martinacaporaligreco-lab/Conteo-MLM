@@ -133,6 +133,8 @@ tbody tr:hover { background: #f8faff; }
 .sku-card.dif-pos { border-top-color: #e74c3c; }
 .sku-card.dif-neg { border-top-color: #e74c3c; }
 .sku-card.dif-zero { border-top-color: #2ecc71; }
+.sku-card.sku-seriado { box-shadow: 0 0 0 2px #f5d142 inset, 0 2px 8px rgba(245,209,66,0.25); background: #fffdf3; }
+.sku-badge-seriado { position: absolute; top: 8px; right: 8px; background: #f5d142; color: #5a4500; font-size: 9px; font-weight: 700; padding: 2px 6px; border-radius: 4px; letter-spacing: 0.5px; }
 .sku-name { font-size: 18px; font-weight: 700; color: #1a2540; }
 .sku-num { font-size: 22px; font-weight: 700; color: #1a2540; line-height: 1.2; margin-top: 4px; font-variant-numeric: tabular-nums; }
 .sku-sub { font-size: 11px; color: #5a6378; margin-top: 2px; }
@@ -173,6 +175,7 @@ tbody tr:hover { background: #f8faff; }
   <div class="header-right">
     <span class="exec-status" id="execStatus">Sin ejecución registrada</span>
     <button class="btn-new" onclick="borrarCache()" title="Borra los archivos cacheados en este navegador" style="background:#5a3a3a;border-color:#7a4a4a">🗑 Borrar cache</button>
+    <button class="btn-new" onclick="borrarFisicoGH(event)" title="Elimina el archivo de Conteo Físico tanto del navegador como del repositorio GitHub compartido" style="background:#7a2a2a;border-color:#a04040">🗑 Borrar físico (GitHub)</button>
     <button class="btn-new" onclick="resetAll(event)">← Nueva ejecución</button>
   </div>
 </div>
@@ -377,6 +380,10 @@ tbody tr:hover { background: #f8faff; }
 <script>
 const state = { sistema: null, sistemaRaw: null, fisico: null, fisicoRaw: null, masterRaw: null, masterIdx: null, cruce: null, ejecucionFecha: null };
 
+// SKUs seriados México (POINTs) — fuente: Google Sheets "POINT MP"
+const SKUS_SERIADOS_MX = new Set(['1TEL','30TEL','40ALQ','40AM','40AMA','40AMT','81AM','81AMA','54AM','40REF','81LAB','54LAB','30LAB','40LAB']);
+const isSeriado = (sku) => SKUS_SERIADOS_MX.has(String(sku||'').trim().toUpperCase());
+
 // === Persistencia con IndexedDB (sobrevive recargas del tablero) ===
 const DB_NAME = 'conteoMLM_v1', DB_STORE = 'cache';
 let _dbP = null;
@@ -411,6 +418,14 @@ function dbClear() {
   return openDB().then(db => new Promise((resolve) => {
     const tx = db.transaction(DB_STORE, 'readwrite');
     tx.objectStore(DB_STORE).clear();
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => resolve();
+  })).catch(() => {});
+}
+function dbDelete(key) {
+  return openDB().then(db => new Promise((resolve) => {
+    const tx = db.transaction(DB_STORE, 'readwrite');
+    tx.objectStore(DB_STORE).delete(key);
     tx.oncomplete = () => resolve();
     tx.onerror = () => resolve();
   })).catch(() => {});
@@ -510,6 +525,46 @@ async function ghSave(key, value) {
     }
     return { ok: true };
   } catch(e) { console.error('ghSave error', e); return { ok: false, reason: 'exc' }; }
+}
+
+async function ghDelete(key) {
+  if (!ghConfigured()) return { ok: false, reason: 'no_config' };
+  let token = ghToken();
+  if (!token) {
+    token = await promptToken();
+    if (!token) return { ok: false, reason: 'no_token' };
+  }
+  const tryDelete = async (path) => {
+    const apiUrl = `https://api.github.com/repos/${GH_CONFIG.owner}/${GH_CONFIG.repo}/contents/${path}`;
+    const r = await fetch(apiUrl + `?ref=${GH_CONFIG.branch}`, { headers: { Authorization: `token ${token}` } });
+    if (r.status === 404) return { ok: true, skipped: true };
+    if (r.status === 401) { ghClearToken(); return { ok: false, reason: 'bad_token' }; }
+    if (!r.ok) return { ok: false, reason: 'http_' + r.status };
+    const j = await r.json();
+    const r2 = await fetch(apiUrl, {
+      method: 'DELETE',
+      headers: { Authorization: `token ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        message: `delete ${key} — ${new Date().toLocaleString('es-MX')}`,
+        sha: j.sha,
+        branch: GH_CONFIG.branch
+      })
+    });
+    if (!r2.ok) {
+      const errTxt = await r2.text();
+      console.error('ghDelete failed', r2.status, errTxt);
+      if (r2.status === 401) ghClearToken();
+      return { ok: false, reason: 'http_' + r2.status };
+    }
+    return { ok: true };
+  };
+  try {
+    // Borrar ambos formatos por las dudas (gzip nuevo + json legacy)
+    const a = await tryDelete(`data/${key}.json.gz`);
+    const b = await tryDelete(`data/${key}.json`);
+    if (!a.ok && !b.ok) return a;
+    return { ok: true };
+  } catch(e) { console.error('ghDelete error', e); return { ok: false, reason: 'exc' }; }
 }
 
 function ghSyncStatus(state, msg) {
@@ -774,14 +829,18 @@ function ejecutarControl() {
   const sistemaAgg = {};
   const sfc = { total: 0, usado: 0 };
   state.sistemaRaw.forEach(r => {
-    sfc.total++; sfc.usado++;
+    sfc.total++;
+    // Filtro: solo ESTADO = UBICADO
+    const estado = normKey(r['ESTADO']);
+    if (estado !== 'UBICADO') return;
+    sfc.usado++;
     const sku = normKey(r['PRODUCTO']); const ubi = normKey(r['UBICACION']);
     if (!sku) return;
     const key = sku + '||' + ubi;
     if (!sistemaAgg[key]) sistemaAgg[key] = { sku, ubicacion: ubi, unidades: 0, lpns: 0, zona: r['ZONA UBI']||'', descripcion: r['DESCRIPCION UBI']||'', estados: new Set() };
-    sistemaAgg[key].unidades += parseFloat(r['UNID. TOT.']) || 0;
+    sistemaAgg[key].unidades += parseFloat(r['UNID. DISP.']) || 0;
     sistemaAgg[key].lpns += 1;
-    if (r['ESTADO']) sistemaAgg[key].estados.add(normKey(r['ESTADO']));
+    if (r['ESTADO']) sistemaAgg[key].estados.add(estado);
   });
   const fisicoAgg = {};
   state.fisicoRaw.forEach(r => {
@@ -1246,8 +1305,8 @@ function clasificarZona(masterRow, fallbackUbi) {
 function renderOcupacion() {
   if (!state.sistemaRaw || !state.masterIdx) return;
   if (!document.getElementById("donutWrap")) return; // sección removida
-  // Set de ubicaciones únicas con stock UBICADO o ASIGNADO (del CSV LPN Cajas)
-  const ESTADOS_OCUPADO = new Set(['UBICADO', 'ASIGNADO']);
+  // Set de ubicaciones únicas con stock UBICADO (del CSV LPN Cajas)
+  const ESTADOS_OCUPADO = new Set(['UBICADO']);
   const ubisOcupadas = new Set();
   state.sistemaRaw.forEach(r => {
     const estado = String(r['ESTADO'] || '').trim().toUpperCase();
@@ -1312,14 +1371,23 @@ function renderStockPorSKU() {
     if (r.contadoU !== null) { skus[r.sku].fisico += r.contadoU || 0; skus[r.sku].conFisico = true; }
     if (r.sistemaU > 0 || (r.contadoU != null && r.contadoU > 0)) skus[r.sku].ubicaciones++;
   });
-  const list = Object.values(skus).sort((a, b) => b.sistemico - a.sistemico);
+  // Orden: 1° SKUs seriados arriba, 2° por sistémico desc
+  const list = Object.values(skus).sort((a, b) => {
+    const sA = isSeriado(a.sku) ? 1 : 0;
+    const sB = isSeriado(b.sku) ? 1 : 0;
+    if (sA !== sB) return sB - sA;
+    return b.sistemico - a.sistemico;
+  });
   $('skuGrid').innerHTML = list.map(s => {
     const dif = s.conFisico ? (s.sistemico - s.fisico) : null;
     const cls = dif === null ? 'none' : dif === 0 ? 'ok' : dif > 0 ? 'neg' : 'pos';
     const cardCls = dif === null ? '' : dif === 0 ? 'dif-zero' : dif > 0 ? 'dif-neg' : 'dif-pos';
+    const seriadoCls = isSeriado(s.sku) ? ' sku-seriado' : '';
+    const seriadoBadge = isSeriado(s.sku) ? '<span class="sku-badge-seriado">SERIADO</span>' : '';
     const desvioTxt = dif === null ? 'Sin físico' : (dif > 0 ? '+' : '') + fmt(dif);
     return `
-      <div class="sku-card ${cardCls}">
+      <div class="sku-card ${cardCls}${seriadoCls}">
+        ${seriadoBadge}
         <div class="sku-name">${s.sku}</div>
         <div class="sku-sub">${s.ubicaciones} ubicación${s.ubicaciones === 1 ? '' : 'es'}</div>
         <div class="sku-comparison">
@@ -1339,8 +1407,8 @@ function renderStockPorSKU() {
 
 function renderZonasOperativas() {
   if (!state.cruce) return;
-  // Set de ubicaciones UBICADO o ASIGNADO del CSV (válidas contra el master)
-  const ESTADOS_OK = new Set(['UBICADO', 'ASIGNADO']);
+  // Set de ubicaciones UBICADO del CSV (válidas contra el master)
+  const ESTADOS_OK = new Set(['UBICADO']);
   const ubisUbicadas = new Set();
   if (state.sistemaRaw && state.masterIdx) {
     state.sistemaRaw.forEach(r => {
@@ -1471,9 +1539,11 @@ function renderBases() {
       </div>
       ${d.fisSinMatch.length > 0 ? `<div style="margin-top:14px"><div style="font-size:12px;font-weight:600;color:#e74c3c;margin-bottom:6px">❌ Sin match (primeras 10)</div><div class="table-wrap" style="max-height:240px"><table><thead><tr><th>SKU físico</th><th>Ubicación física</th></tr></thead><tbody>${d.fisSinMatch.map(x=>`<tr><td><strong>${x.sku||'<vacío>'}</strong></td><td>${x.ubi||'<vacío>'}</td></tr>`).join('')}</tbody></table></div></div>` : ''}`;
   }
-  const skusU = new Set(state.sistemaRaw.map(r=>normKey(r['PRODUCTO']))).size;
-  const ubisU = new Set(state.sistemaRaw.map(r=>normKey(r['UBICACION']))).size;
-  const sumU = state.sistemaRaw.reduce((s,r)=>s+(parseFloat(r['UNID. TOT.'])||0),0);
+  // Stats sistema: solo registros UBICADO
+  const sistemaUbicado = state.sistemaRaw.filter(r => normKey(r['ESTADO']) === 'UBICADO');
+  const skusU = new Set(sistemaUbicado.map(r=>normKey(r['PRODUCTO']))).size;
+  const ubisU = new Set(sistemaUbicado.map(r=>normKey(r['UBICACION']))).size;
+  const sumU = sistemaUbicado.reduce((s,r)=>s+(parseFloat(r['UNID. DISP.'])||0),0);
   $('stat-sistema').innerHTML = `
     <div class="mini-stat"><div class="mini-stat-label">Total LPNs</div><div class="mini-stat-value">${fmt(state.sistemaRaw.length)}</div></div>
     <div class="mini-stat"><div class="mini-stat-label">SKUs únicos</div><div class="mini-stat-value">${fmt(skusU)}</div></div>
@@ -1483,11 +1553,13 @@ function renderBases() {
   if (!state.agregadoCache) {
     const agg = {};
     state.sistemaRaw.forEach(r => {
+      // Filtro: solo ESTADO = UBICADO
+      if (normKey(r['ESTADO']) !== 'UBICADO') return;
       const sku = normKey(r['PRODUCTO']); const ubi = normKey(r['UBICACION']);
       if (!sku) return;
       const key = sku + '||' + ubi;
       if (!agg[key]) agg[key] = { sku, ubicacion: ubi, sistemaU: 0, lpns: 0, zona: r['ZONA UBI']||'' };
-      agg[key].sistemaU += parseFloat(r['UNID. TOT.']) || 0;
+      agg[key].sistemaU += parseFloat(r['UNID. DISP.']) || 0;
       agg[key].lpns += 1;
     });
     state.agregadoCache = Object.values(agg).sort((a,b)=>b.sistemaU-a.sistemaU);
@@ -2018,6 +2090,51 @@ restoreCache();
 async function borrarCache() {
   await dbClear();
   toast('Cache borrado · recargá la página', 'ok');
+}
+
+// Borrar archivo de Conteo Físico tanto del IndexedDB como del repo GitHub
+async function borrarFisicoGH(ev) {
+  const btn = ev && ev.currentTarget;
+  // Confirmación en dos pasos en el mismo botón
+  if (btn && !btn.dataset.c) {
+    const o = btn.textContent;
+    btn.dataset.c = '1';
+    btn.textContent = '¿Confirmar? Borra de GitHub';
+    btn.style.background = '#e74c3c';
+    setTimeout(() => { btn.textContent = o; btn.style.background = ''; delete btn.dataset.c; }, 3000);
+    return;
+  }
+  if (btn) { delete btn.dataset.c; btn.style.background = ''; btn.disabled = true; btn.textContent = '⏳ Borrando...'; }
+  try {
+    // 1) Borrar local
+    await dbDelete('fisicoRaw');
+    // 2) Borrar de GitHub (si está configurado)
+    let ghMsg = '';
+    if (ghConfigured()) {
+      ghSyncStatus('saving');
+      const res = await ghDelete('fisicoRaw');
+      if (res.ok) { ghSyncStatus('ok', 'físico eliminado'); ghMsg = ' + GitHub'; }
+      else if (res.reason === 'no_token') { ghSyncStatus('err', 'sin token'); ghMsg = ' (no se pudo GitHub: sin token)'; }
+      else { ghSyncStatus('err', res.reason); ghMsg = ` (no se pudo GitHub: ${res.reason})`; }
+    }
+    // 3) Reset state + UI
+    state.fisico = null; state.fisicoRaw = null;
+    state.cruce = null; state.cobertura = null; state.agregadoCache = null; state.invCache = null;
+    const card = document.getElementById('card-fisico');
+    if (card) card.classList.remove('loaded', 'error');
+    const st = document.getElementById('status-fisico');
+    if (st) st.textContent = 'Sin cargar · click o arrastrá';
+    const fi = document.getElementById('file-fisico');
+    if (fi) fi.value = '';
+    const btnE = document.getElementById('btnExec');
+    if (btnE) btnE.classList.remove('ready');
+    toast('Conteo Físico eliminado · local' + ghMsg, 'ok');
+  } catch (e) {
+    console.error('borrarFisicoGH', e);
+    toast('Error al borrar físico: ' + (e.message || e), 'err');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '🗑 Borrar físico (GitHub)'; }
+  }
 }
 </script>
 
