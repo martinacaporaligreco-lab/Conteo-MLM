@@ -84,6 +84,9 @@ tbody tr:hover { background: #f8faff; }
 .chip { padding: 5px 12px; border-radius: 16px; background: #eef2f7; color: #1a2540; font-size: 12px; font-weight: 600; cursor: pointer; user-select: none; border: 1px solid transparent; transition: all .15s; }
 .chip:hover { background: #dfe6ef; }
 .chip.active { background: #1e3a5f; color: #fff; border-color: #1e3a5f; }
+.chip.chip-seriado { background: #fff4e0; color: #8a5200; border-color: #f0c989; }
+.chip.chip-seriado:hover { background: #ffe9c4; }
+.chip.chip-seriado.active { background: #d97706; color: #fff; border-color: #d97706; }
 ::-webkit-scrollbar-button { display: none; }
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-thumb { background: #cdd5e0; border-radius: 4px; }
@@ -336,6 +339,7 @@ tbody tr:hover { background: #f8faff; }
         <span class="chip" data-fl="sobrante" onclick="setCruceFilter('sobrante')">Sobrantes</span>
         <span class="chip" data-fl="solo_fisico" onclick="setCruceFilter('solo_fisico')">Solo físico</span>
         <span class="chip" data-fl="no_contado" onclick="setCruceFilter('no_contado')">No contado</span>
+        <span class="chip chip-seriado" id="chipSeriados" onclick="toggleSoloSeriados()" title="Mostrar solo SKUs POINT seriados de México">★ Seriados</span>
       </div>
       <div class="toolbar">
         <input type="text" class="search" id="searchCruce" placeholder="🔍 Buscar SKU o ubicación..." oninput="renderCruce()">
@@ -378,7 +382,9 @@ tbody tr:hover { background: #f8faff; }
 <div class="footer">Conteo Físico Stock MLM México · ICQA Mercado Pago · Procesamiento local en navegador</div>
 <div class="toast" id="toast"></div>
 <script>
-const state = { sistema: null, sistemaRaw: null, fisico: null, fisicoRaw: null, masterRaw: null, masterIdx: null, cruce: null, ejecucionFecha: null };
+const state = { sistema: null, sistemaRaw: null, fisico: null, fisicoRaw: null, masterRaw: null, masterIdx: null, cruce: null, ejecucionFecha: null, soloSeriados: false };
+// SKUs POINT seriados México (fuente: Google Sheet "POINT MP")
+const SERIADOS_MX = new Set(['1TEL','30TEL','40ALQ','40AM','40AMA','40AMT','81AM','81AMA','54AM','40REF','81LAB','54LAB','30LAB','40LAB']);
 
 // SKUs seriados México (POINTs) — fuente: Google Sheets "POINT MP"
 const SKUS_SERIADOS_MX = new Set(['1TEL','30TEL','40ALQ','40AM','40AMA','40AMT','81AM','81AMA','54AM','40REF','81LAB','54LAB','30LAB','40LAB']);
@@ -1681,7 +1687,14 @@ function renderPreviewTable(id, data, cols, lim) {
 function setCruceFilter(v) {
   const sel = document.getElementById('filtroCruce');
   if (sel) sel.value = v;
-  document.querySelectorAll('#cruceChips .chip').forEach(c => c.classList.toggle('active', (c.getAttribute('data-fl') || '') === v));
+  document.querySelectorAll('#cruceChips .chip:not(.chip-seriado)').forEach(c => c.classList.toggle('active', (c.getAttribute('data-fl') || '') === v));
+  renderCruce();
+}
+
+function toggleSoloSeriados() {
+  state.soloSeriados = !state.soloSeriados;
+  const chip = document.getElementById('chipSeriados');
+  if (chip) chip.classList.toggle('active', state.soloSeriados);
   renderCruce();
 }
 
@@ -1786,11 +1799,14 @@ function renderCruce() {
   if (!state.cruce) return;
   // Marcar chip activa
   const curFl = ($('filtroCruce') && $('filtroCruce').value) || '';
-  document.querySelectorAll('#cruceChips .chip').forEach(c => c.classList.toggle('active', (c.getAttribute('data-fl') || '') === curFl));
+  document.querySelectorAll('#cruceChips .chip:not(.chip-seriado)').forEach(c => c.classList.toggle('active', (c.getAttribute('data-fl') || '') === curFl));
+  const chipSer = document.getElementById('chipSeriados');
+  if (chipSer) chipSer.classList.toggle('active', !!state.soloSeriados);
   const q = ($('searchCruce').value||'').toUpperCase().trim();
   const fl = $('filtroCruce').value;
   let d = state.cruce;
   if (q) d = d.filter(r=>(r.sku||'').includes(q)||(r.ubicacion||'').includes(q)||(r.descripcion||'').toUpperCase().includes(q));
+  if (state.soloSeriados) d = d.filter(r => SERIADOS_MX.has(String(r.sku||'').toUpperCase().trim()));
   if (fl) { if (fl==='dif') d = d.filter(r=>r.resultado!=='ok'&&r.resultado!=='no_contado'); else d = d.filter(r=>r.resultado===fl); }
   // Sort por columna con dirección
   const cs = state.cruceSort || { col: 'ubi', dir: 'asc' };
@@ -2158,21 +2174,4 @@ async function borrarFisicoGH(ev) {
   <div style="background:#fff;padding:24px;border-radius:12px;max-width:480px;width:90%;box-shadow:0 10px 40px rgba(0,0,0,0.2)">
     <h3 style="margin:0 0 8px;color:#1a1a1a">🔑 Token de GitHub</h3>
     <p style="margin:0 0 12px;color:#555;font-size:14px">Necesitás un Personal Access Token para que los archivos que cargues se vean desde otros navegadores. Lo guardamos solo en tu computadora — se pide una sola vez.</p>
-    <p style="margin:0 0 12px;font-size:13px"><a href="https://github.com/settings/tokens/new?scopes=repo&description=Conteo%20MLM" target="_blank" rel="noopener" style="color:#0366d6">→ Generar token nuevo (scope: repo)</a></p>
-    <input id="gh-token-input" type="password" placeholder="ghp_xxxxxxxxxxxxxxxxxxxxxxxx" style="width:100%;padding:10px;border:1px solid #ccc;border-radius:6px;font-family:monospace;font-size:13px;box-sizing:border-box"/>
-    <div style="margin-top:14px;display:flex;gap:8px;justify-content:flex-end">
-      <button id="gh-token-cancel" style="padding:8px 14px;border:1px solid #ccc;background:#fff;border-radius:6px;cursor:pointer">Cancelar</button>
-      <button id="gh-token-save" style="padding:8px 14px;border:none;background:#2da44e;color:#fff;border-radius:6px;cursor:pointer;font-weight:600">Guardar</button>
-    </div>
-  </div>
-</div>
-<div id="gh-sync-status" style="position:fixed;bottom:14px;right:14px;padding:8px 14px;border-radius:20px;font-size:12px;font-family:system-ui,sans-serif;background:rgba(0,0,0,0.78);color:#fff;z-index:9998;transition:all .3s"></div>
-<style>
-  #gh-sync-status.ok { background:#1f883d }
-  #gh-sync-status.err { background:#cf222e }
-  #gh-sync-status.saving { background:#bf8700 }
-  #gh-sync-status:empty { display:none }
-</style>
-
-</body>
-</html>
+    <p style="margin:0 0 12px;font-size:13px"><a href="https://github.com/settings/tokens/new?scopes=repo&description=Conteo%20MLM" target="_blank" rel="noopener" style="color:#0366d6">→ Generar token nuevo (scope: repo)</
