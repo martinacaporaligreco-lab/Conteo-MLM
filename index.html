@@ -196,8 +196,8 @@ tbody tr:hover { background: #f8faff; }
   </div>
   <div class="config-item"><label>Depósito:</label><input type="text" id="cfgDeposito" value="MLMMEX09 — Mexico 9" class="wide"></div>
   <div class="config-item"><label>Fecha conteo:</label><input type="date" id="cfgFecha"></div>
-  <div class="config-item"><label>Umbral diferencia:</label><input type="number" id="cfgUmbral" value="0" min="0"><span style="color:#5a6378;font-size:12px">unidades</span></div>
-  <div class="config-meta">Umbral 0 = estricto · Cruce: SKU + Ubicación (tolerante a formato)</div>
+  <input type="hidden" id="cfgUmbral" value="0">
+  <div class="config-meta">Cruce: SKU + Ubicación (tolerante a formato)</div>
 </div>
 <div class="upload-grid" id="upload-grid-resumen">
   <div class="upload-card" id="card-sistema">
@@ -2192,7 +2192,7 @@ function exportAjustes() {
   toast('Pendientes: '+d.length,'ok');
 }
 
-try { document.getElementById('cfgFecha').valueAsDate = new Date(); } catch(e) {}
+try { const _d=new Date(); _d.setDate(_d.getDate()-1); document.getElementById('cfgFecha').valueAsDate = _d; } catch(e) {}
 (function libCheck() {
   const ok = { papa: typeof Papa !== 'undefined', xlsx: typeof XLSX !== 'undefined' };
   const msg = (ok.papa && ok.xlsx) ? '✓ Tablero listo · cargá los archivos' : '⚠ FALTAN LIBRERÍAS';
@@ -2287,3 +2287,4 @@ async function borrarFisicoGH(ev) {
 </script>
 </body>
 </html>
+                                                                                                                
