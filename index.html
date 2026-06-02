@@ -2179,6 +2179,55 @@ async function restoreCache() {
   } catch (e) { console.warn('No se pudo restaurar', e); }
 }
 restoreCache();
+
+// Botón para borrar cache (lo agrego al botón "Nueva ejecución" como acción secundaria)
+async function borrarCache() {
+  await dbClear();
+  toast('Cache borrado · recargá la página', 'ok');
+}
+
+// Borrar archivo de Conteo Físico tanto del IndexedDB como del repo GitHub
+async function borrarFisicoGH(ev) {
+  const btn = ev && ev.currentTarget;
+  if (btn && !btn.dataset.c) {
+    const o = btn.textContent;
+    btn.dataset.c = '1';
+    btn.textContent = '¿Confirmar? Borra de GitHub';
+    btn.style.background = '#e74c3c';
+    setTimeout(() => { btn.textContent = o; btn.style.background = ''; delete btn.dataset.c; }, 3000);
+    return;
+  }
+  if (btn) { delete btn.dataset.c; btn.style.background = ''; btn.disabled = true; btn.textContent = '⏳ Borrando...'; }
+  try {
+    await dbDelete('fisicoRaw');
+    let ghMsg = '';
+    if (ghConfigured()) {
+      ghSyncStatus('saving');
+      const res = await ghDelete('fisicoRaw');
+      if (res.ok) { ghSyncStatus('ok', 'físico eliminado'); ghMsg = ' + GitHub'; }
+      else if (res.reason === 'no_token') { ghSyncStatus('err', 'sin token'); ghMsg = ' (no se pudo GitHub: sin token)'; }
+      else { ghSyncStatus('err', res.reason); ghMsg = ` (no se pudo GitHub: ${res.reason})`; }
+    }
+    state.fisico = null; state.fisicoRaw = null;
+    state.cruce = null; state.cobertura = null; state.agregadoCache = null; state.invCache = null;
+    const card = document.getElementById('card-fisico');
+    if (card) card.classList.remove('loaded', 'error');
+    const st = document.getElementById('status-fisico');
+    if (st) st.textContent = 'Sin cargar · click o arrastrá';
+    const fi = document.getElementById('file-fisico');
+    if (fi) fi.value = '';
+    const btnE = document.getElementById('btnExec');
+    if (btnE) btnE.classList.remove('ready');
+    try { checkReady(); } catch(e) {}
+    toast('Conteo Físico eliminado · local' + ghMsg, 'ok');
+  } catch (e) {
+    console.error('borrarFisicoGH', e);
+    toast('Error al borrar físico: ' + (e.message || e), 'err');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '🗑 Borrar físico (GitHub)'; }
+  }
+}
+
 </script>
 </body>
 </html>
