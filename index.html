@@ -318,6 +318,11 @@ tbody tr:hover { background: #f8faff; }
     </div>
   </div>
   <div class="panel" id="panel-cruce">
+    <div class="section-card" id="resumen-diferencias-finales" style="display:none;background:#fff8e1;border:2px solid #f5d142">
+      <div class="section-title">📋 Resumen de diferencias finales (físico vs sistémico)</div>
+      <div class="section-desc">Ubicaciones que llegaron al 3.º conteo con diferencia confirmada.</div>
+      <div class="table-wrap" style="max-width:760px"><table id="tablaResumenDifFinales" style="width:100%;border-collapse:collapse;font-size:13px"></table></div>
+    </div>
     <div class="section-card">
       <div class="section-title">🏆 Top 20 mayores diferencias <button class="btn-export" onclick="exportTopDif()">⬇ Exportar Excel</button></div>
       <div class="section-desc">Las 20 ubicaciones con mayor diferencia absoluta. Foco rápido en lo más importante.</div>
@@ -331,10 +336,6 @@ tbody tr:hover { background: #f8faff; }
     <div class="section-card">
       <div class="section-title">Cruce Sistema ↔ Físico <button class="btn-export" onclick="exportCruce()">⬇ Exportar Excel</button></div>
       <div class="section-desc">Una fila por par SKU + Ubicación. Diferencia = Sistema − Conteo Final.</div>
-      <div id="resumen-diferencias-finales" style="margin:12px 0 16px;display:none">
-        <div style="font-weight:700;margin-bottom:8px;color:#1a2540;font-size:14px">📋 Resumen de diferencias finales (físico vs sistémico)</div>
-        <div class="table-wrap" style="max-width:720px"><table id="tablaResumenDifFinales" style="width:100%;border-collapse:collapse;font-size:13px"></table></div>
-      </div>
       <div class="filter-chips" id="cruceChips" style="display:flex;gap:6px;flex-wrap:wrap;margin:8px 0 12px">
         <span class="chip" data-fl="" onclick="setCruceFilter('')">Todos</span>
         <span class="chip" data-fl="dif" onclick="setCruceFilter('dif')">Con diferencia</span>
