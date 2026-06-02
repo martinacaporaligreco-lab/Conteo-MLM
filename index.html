@@ -2171,4 +2171,14 @@ async function restoreCache() {
       document.getElementById('card-master').classList.add('loaded');
       document.getElementById('status-master').textContent = '✓ ' + Object.keys(mas).length.toLocaleString('es-MX') + ' ubicaciones (compartido)';
     }
-    if (sis || fis 
+    if (sis || fis || mas) {
+      checkReady();
+      try { renderBases(); } catch(e) {}
+      toast('Datos restaurados — listo para ejecutar', 'ok');
+    }
+  } catch (e) { console.warn('No se pudo restaurar', e); }
+}
+restoreCache();
+</script>
+</body>
+</html>
