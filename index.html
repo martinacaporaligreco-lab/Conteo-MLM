@@ -323,19 +323,21 @@ tbody tr:hover { background: #f8faff; }
       <div class="section-desc">Ubicaciones que llegaron al 3.º conteo con diferencia confirmada.</div>
       <div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap">
         <div class="table-wrap" style="max-width:760px;flex:1;min-width:480px"><table id="tablaResumenDifFinales" style="width:100%;border-collapse:collapse;font-size:13px"></table></div>
-        <div id="kpisAccuracy" style="display:flex;flex-direction:column;gap:10px;min-width:220px">
-          <div style="background:#fff;border:1px solid #d6c97a;border-radius:8px;padding:12px 14px;box-shadow:0 1px 2px rgba(0,0,0,.04)">
-            <div style="font-size:11px;color:#5a6378;text-transform:uppercase;letter-spacing:.4px;font-weight:700">Unid. totales seriados</div>
-            <div id="kpiTotalSeriados" style="font-size:24px;font-weight:800;color:#1a2540;margin-top:4px">—</div>
+        <div id="kpisAccuracy" style="display:flex;flex-direction:column;gap:10px;min-width:260px;max-width:320px">
+          <div style="background:linear-gradient(135deg,#1f3554 0%,#2a4570 100%);border:1px solid #1a2540;border-radius:10px;padding:14px 16px;box-shadow:0 2px 6px rgba(0,0,0,.08)">
+            <div style="font-size:11px;color:#cfd8e6;text-transform:uppercase;letter-spacing:.5px;font-weight:700">🎯 Accuracy</div>
+            <div id="kpiAccuracy" style="font-size:34px;font-weight:800;color:#7be0a0;margin-top:4px;line-height:1.1">—</div>
+            <div id="kpiAccuracyCalc" style="font-size:11px;color:#cfd8e6;margin-top:4px;font-family:ui-monospace,monospace">—</div>
           </div>
-          <div style="background:#fff;border:1px solid #f3b9b9;border-radius:8px;padding:12px 14px;box-shadow:0 1px 2px rgba(0,0,0,.04)">
-            <div style="font-size:11px;color:#5a6378;text-transform:uppercase;letter-spacing:.4px;font-weight:700">Perdidos (faltantes)</div>
-            <div id="kpiPerdidos" style="font-size:24px;font-weight:800;color:#b03030;margin-top:4px">—</div>
+          <div style="background:#fff;border:1px solid #d6c97a;border-radius:10px;padding:12px 14px;box-shadow:0 1px 2px rgba(0,0,0,.04)">
+            <div style="font-size:11px;color:#5a6378;text-transform:uppercase;letter-spacing:.4px;font-weight:700">📦 Stock total POINTs (seriados)</div>
+            <div id="kpiTotalSeriados" style="font-size:22px;font-weight:800;color:#1a2540;margin-top:4px">—</div>
+            <div id="kpiTotalSeriadosDesc" style="font-size:11px;color:#5a6378;margin-top:2px">— SKUs en sistema</div>
           </div>
-          <div style="background:#1f3554;border:1px solid #1a2540;border-radius:8px;padding:12px 14px;box-shadow:0 1px 2px rgba(0,0,0,.04)">
-            <div style="font-size:11px;color:#cfd8e6;text-transform:uppercase;letter-spacing:.4px;font-weight:700">Accuracy</div>
-            <div id="kpiAccuracy" style="font-size:28px;font-weight:800;color:#7be0a0;margin-top:4px">—</div>
-            <div id="kpiAccuracyDesc" style="font-size:11px;color:#cfd8e6;margin-top:2px">1 − perdidos / unid. sistémicas</div>
+          <div style="background:#fff;border:1px solid #f3b9b9;border-radius:10px;padding:12px 14px;box-shadow:0 1px 2px rgba(0,0,0,.04)">
+            <div style="font-size:11px;color:#5a6378;text-transform:uppercase;letter-spacing:.4px;font-weight:700">📉 Perdidos (diferencias 3.º conteo)</div>
+            <div id="kpiPerdidos" style="font-size:22px;font-weight:800;color:#b03030;margin-top:4px">—</div>
+            <div id="kpiPerdidosDesc" style="font-size:11px;color:#5a6378;margin-top:2px">— ubicaciones con dif.</div>
           </div>
         </div>
       </div>
@@ -1902,23 +1904,33 @@ function renderResumenDifFinales() {
   const box = document.getElementById('resumen-diferencias-finales');
   const tbl = document.getElementById('tablaResumenDifFinales');
   if (!box || !tbl) return;
-  // KPIs accuracy: perdidos = suma absoluta de diferencias confirmadas en el 3.º conteo
-  // totSeriados = total sistémico de todos los SKUs seriados del cruce
+  // KPIs accuracy
   let totSeriados = 0;
-  state.cruce.forEach(r => { totSeriados += (r.sistemaU || 0); });
+  const skuSet = new Set();
+  state.cruce.forEach(r => {
+    totSeriados += (r.sistemaU || 0);
+    if ((r.sistemaU||0) > 0 && r.sku) skuSet.add(String(r.sku).toUpperCase().trim());
+  });
   let totPerdidos = 0;
   difs.forEach(r => { totPerdidos += Math.abs(r.diferencia || 0); });
   const accPct = totSeriados > 0 ? (1 - totPerdidos / totSeriados) * 100 : 100;
   const fmtKpi = n => (n||0).toLocaleString('es-MX');
   const eT = document.getElementById('kpiTotalSeriados');
+  const eTd = document.getElementById('kpiTotalSeriadosDesc');
   const eP = document.getElementById('kpiPerdidos');
+  const ePd = document.getElementById('kpiPerdidosDesc');
   const eA = document.getElementById('kpiAccuracy');
-  if (eT) eT.textContent = fmtKpi(totSeriados);
-  if (eP) eP.textContent = fmtKpi(totPerdidos);
+  const eAc = document.getElementById('kpiAccuracyCalc');
+  if (eT) eT.textContent = fmtKpi(totSeriados) + ' u';
+  if (eTd) eTd.textContent = 'distribuidas en ' + skuSet.size + ' SKUs';
+  if (eP) eP.textContent = fmtKpi(totPerdidos) + ' u';
+  if (ePd) ePd.textContent = difs.length + ' ubicaciones con diferencia';
   if (eA) {
-    eA.textContent = accPct.toFixed(2) + '%';
+    const emoji = accPct >= 99.5 ? ' 🎉🚀' : (accPct >= 99 ? ' ✨' : '');
+    eA.textContent = accPct.toFixed(2).replace('.', ',') + '%' + emoji;
     eA.style.color = accPct >= 99 ? '#7be0a0' : (accPct >= 97 ? '#f5d142' : '#ff8a8a');
   }
+  if (eAc) eAc.textContent = '1 − ' + fmtKpi(totPerdidos) + ' / ' + fmtKpi(totSeriados);
   if (!difs.length) { box.style.display='none'; return; }
   box.style.display='';
   const fmt = n => (n||0).toLocaleString('es-MX');
