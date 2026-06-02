@@ -1902,9 +1902,7 @@ function renderResumenDifFinales() {
   const box = document.getElementById('resumen-diferencias-finales');
   const tbl = document.getElementById('tablaResumenDifFinales');
   if (!box || !tbl) return;
-  if (!difs.length) { box.style.display='none'; return; }
-  box.style.display='';
-  // KPIs accuracy (sobre todos los seriados del cruce, no solo los con diferencia)
+  // KPIs accuracy (sobre todos los seriados del cruce)
   let totSeriados = 0, totPerdidos = 0;
   state.cruce.forEach(r => {
     const sis = r.sistemaU || 0;
@@ -1923,6 +1921,8 @@ function renderResumenDifFinales() {
     eA.textContent = accPct.toFixed(2) + '%';
     eA.style.color = accPct >= 99 ? '#7be0a0' : (accPct >= 97 ? '#f5d142' : '#ff8a8a');
   }
+  if (!difs.length) { box.style.display='none'; return; }
+  box.style.display='';
   const fmt = n => (n||0).toLocaleString('es-MX');
   let totalFis=0, totalSis=0, totalDif=0;
   difs.forEach(r => { totalFis+=r.contadoU||0; totalSis+=r.sistemaU||0; totalDif+=r.diferencia||0; });
@@ -2264,4 +2264,63 @@ async function restoreCache() {
       state.masterIdx = mas;
       state.masterRaw = masRaw || [];
       document.getElementById('card-master').classList.add('loaded');
-      document.getElementById('status-master').textContent = '✓ ' + Object.keys(
+      document.getElementById('status-master').textContent = '✓ ' + Object.keys(mas).length.toLocaleString('es-MX') + ' ubicaciones (compartido)';
+    }
+    if (sis || fis || mas) {
+      checkReady();
+      try { renderBases(); } catch(e) {}
+      toast('Datos restaurados — listo para ejecutar', 'ok');
+    }
+  } catch (e) { console.warn('No se pudo restaurar', e); }
+}
+restoreCache();
+
+async function borrarCache() {
+  await dbClear();
+  toast('Cache borrado · recargá la página', 'ok');
+}
+
+async function borrarFisicoGH(ev) {
+  const btn = ev && ev.currentTarget;
+  if (btn && !btn.dataset.c) {
+    const o = btn.textContent;
+    btn.dataset.c = '1';
+    btn.textContent = '¿Confirmar? Borra de GitHub';
+    btn.style.background = '#e74c3c';
+    setTimeout(() => { btn.textContent = o; btn.style.background = ''; delete btn.dataset.c; }, 3000);
+    return;
+  }
+  if (btn) { delete btn.dataset.c; btn.style.background = ''; btn.disabled = true; btn.textContent = '⏳ Borrando...'; }
+  try {
+    await dbDelete('fisicoRaw');
+    let ghMsg = '';
+    if (typeof ghConfigured === 'function' && ghConfigured()) {
+      ghSyncStatus('saving');
+      const res = await ghDelete('fisicoRaw');
+      if (res.ok) { ghSyncStatus('ok', 'físico eliminado'); ghMsg = ' + GitHub'; }
+      else if (res.reason === 'no_token') { ghSyncStatus('err', 'sin token'); ghMsg = ' (sin token)'; }
+      else { ghSyncStatus('err', res.reason); ghMsg = ` (no se pudo: ${res.reason})`; }
+    }
+    state.fisico = null; state.fisicoRaw = null;
+    state.cruce = null; state.cobertura = null; state.agregadoCache = null; state.invCache = null;
+    const card = document.getElementById('card-fisico');
+    if (card) card.classList.remove('loaded', 'error');
+    const st = document.getElementById('status-fisico');
+    if (st) st.textContent = 'Sin cargar · click o arrastrá';
+    const fi = document.getElementById('file-fisico');
+    if (fi) fi.value = '';
+    const btnE = document.getElementById('btnExec');
+    if (btnE) btnE.classList.remove('ready');
+    try { checkReady(); } catch(e) {}
+    toast('Conteo Físico eliminado · local' + ghMsg, 'ok');
+  } catch (e) {
+    console.error('borrarFisicoGH', e);
+    toast('Error al borrar físico: ' + (e.message || e), 'err');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '🗑 Borrar físico (GitHub)'; }
+  }
+}
+</script>
+</body>
+</html>
+                                                                                                                
