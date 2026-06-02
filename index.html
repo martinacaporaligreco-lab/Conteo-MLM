@@ -321,7 +321,24 @@ tbody tr:hover { background: #f8faff; }
     <div class="section-card" id="resumen-diferencias-finales" style="display:none;background:#fff8e1;border:2px solid #f5d142">
       <div class="section-title">📋 Resumen de diferencias finales (físico vs sistémico)</div>
       <div class="section-desc">Ubicaciones que llegaron al 3.º conteo con diferencia confirmada.</div>
-      <div class="table-wrap" style="max-width:760px"><table id="tablaResumenDifFinales" style="width:100%;border-collapse:collapse;font-size:13px"></table></div>
+      <div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap">
+        <div class="table-wrap" style="max-width:760px;flex:1;min-width:480px"><table id="tablaResumenDifFinales" style="width:100%;border-collapse:collapse;font-size:13px"></table></div>
+        <div id="kpisAccuracy" style="display:flex;flex-direction:column;gap:10px;min-width:220px">
+          <div style="background:#fff;border:1px solid #d6c97a;border-radius:8px;padding:12px 14px;box-shadow:0 1px 2px rgba(0,0,0,.04)">
+            <div style="font-size:11px;color:#5a6378;text-transform:uppercase;letter-spacing:.4px;font-weight:700">Unid. totales seriados</div>
+            <div id="kpiTotalSeriados" style="font-size:24px;font-weight:800;color:#1a2540;margin-top:4px">—</div>
+          </div>
+          <div style="background:#fff;border:1px solid #f3b9b9;border-radius:8px;padding:12px 14px;box-shadow:0 1px 2px rgba(0,0,0,.04)">
+            <div style="font-size:11px;color:#5a6378;text-transform:uppercase;letter-spacing:.4px;font-weight:700">Perdidos (faltantes)</div>
+            <div id="kpiPerdidos" style="font-size:24px;font-weight:800;color:#b03030;margin-top:4px">—</div>
+          </div>
+          <div style="background:#1f3554;border:1px solid #1a2540;border-radius:8px;padding:12px 14px;box-shadow:0 1px 2px rgba(0,0,0,.04)">
+            <div style="font-size:11px;color:#cfd8e6;text-transform:uppercase;letter-spacing:.4px;font-weight:700">Accuracy</div>
+            <div id="kpiAccuracy" style="font-size:28px;font-weight:800;color:#7be0a0;margin-top:4px">—</div>
+            <div id="kpiAccuracyDesc" style="font-size:11px;color:#cfd8e6;margin-top:2px">1 − perdidos / unid. sistémicas</div>
+          </div>
+        </div>
+      </div>
     </div>
     <div class="section-card">
       <div class="section-title">🏆 Top 20 mayores diferencias <button class="btn-export" onclick="exportTopDif()">⬇ Exportar Excel</button></div>
@@ -1887,6 +1904,25 @@ function renderResumenDifFinales() {
   if (!box || !tbl) return;
   if (!difs.length) { box.style.display='none'; return; }
   box.style.display='';
+  // KPIs accuracy (sobre todos los seriados del cruce, no solo los con diferencia)
+  let totSeriados = 0, totPerdidos = 0;
+  state.cruce.forEach(r => {
+    const sis = r.sistemaU || 0;
+    const fis = r.contadoU || 0;
+    totSeriados += sis;
+    if (sis > fis) totPerdidos += (sis - fis);
+  });
+  const accPct = totSeriados > 0 ? (1 - totPerdidos / totSeriados) * 100 : 100;
+  const fmtKpi = n => (n||0).toLocaleString('es-MX');
+  const eT = document.getElementById('kpiTotalSeriados');
+  const eP = document.getElementById('kpiPerdidos');
+  const eA = document.getElementById('kpiAccuracy');
+  if (eT) eT.textContent = fmtKpi(totSeriados);
+  if (eP) eP.textContent = fmtKpi(totPerdidos);
+  if (eA) {
+    eA.textContent = accPct.toFixed(2) + '%';
+    eA.style.color = accPct >= 99 ? '#7be0a0' : (accPct >= 97 ? '#f5d142' : '#ff8a8a');
+  }
   const fmt = n => (n||0).toLocaleString('es-MX');
   let totalFis=0, totalSis=0, totalDif=0;
   difs.forEach(r => { totalFis+=r.contadoU||0; totalSis+=r.sistemaU||0; totalDif+=r.diferencia||0; });
@@ -2228,63 +2264,4 @@ async function restoreCache() {
       state.masterIdx = mas;
       state.masterRaw = masRaw || [];
       document.getElementById('card-master').classList.add('loaded');
-      document.getElementById('status-master').textContent = '✓ ' + Object.keys(mas).length.toLocaleString('es-MX') + ' ubicaciones (compartido)';
-    }
-    if (sis || fis || mas) {
-      checkReady();
-      try { renderBases(); } catch(e) {}
-      toast('Datos restaurados — listo para ejecutar', 'ok');
-    }
-  } catch (e) { console.warn('No se pudo restaurar', e); }
-}
-restoreCache();
-
-async function borrarCache() {
-  await dbClear();
-  toast('Cache borrado · recargá la página', 'ok');
-}
-
-async function borrarFisicoGH(ev) {
-  const btn = ev && ev.currentTarget;
-  if (btn && !btn.dataset.c) {
-    const o = btn.textContent;
-    btn.dataset.c = '1';
-    btn.textContent = '¿Confirmar? Borra de GitHub';
-    btn.style.background = '#e74c3c';
-    setTimeout(() => { btn.textContent = o; btn.style.background = ''; delete btn.dataset.c; }, 3000);
-    return;
-  }
-  if (btn) { delete btn.dataset.c; btn.style.background = ''; btn.disabled = true; btn.textContent = '⏳ Borrando...'; }
-  try {
-    await dbDelete('fisicoRaw');
-    let ghMsg = '';
-    if (typeof ghConfigured === 'function' && ghConfigured()) {
-      ghSyncStatus('saving');
-      const res = await ghDelete('fisicoRaw');
-      if (res.ok) { ghSyncStatus('ok', 'físico eliminado'); ghMsg = ' + GitHub'; }
-      else if (res.reason === 'no_token') { ghSyncStatus('err', 'sin token'); ghMsg = ' (sin token)'; }
-      else { ghSyncStatus('err', res.reason); ghMsg = ` (no se pudo: ${res.reason})`; }
-    }
-    state.fisico = null; state.fisicoRaw = null;
-    state.cruce = null; state.cobertura = null; state.agregadoCache = null; state.invCache = null;
-    const card = document.getElementById('card-fisico');
-    if (card) card.classList.remove('loaded', 'error');
-    const st = document.getElementById('status-fisico');
-    if (st) st.textContent = 'Sin cargar · click o arrastrá';
-    const fi = document.getElementById('file-fisico');
-    if (fi) fi.value = '';
-    const btnE = document.getElementById('btnExec');
-    if (btnE) btnE.classList.remove('ready');
-    try { checkReady(); } catch(e) {}
-    toast('Conteo Físico eliminado · local' + ghMsg, 'ok');
-  } catch (e) {
-    console.error('borrarFisicoGH', e);
-    toast('Error al borrar físico: ' + (e.message || e), 'err');
-  } finally {
-    if (btn) { btn.disabled = false; btn.textContent = '🗑 Borrar físico (GitHub)'; }
-  }
-}
-</script>
-</body>
-</html>
-                                                                                                                
+      document.getElementById('status-master').textContent = '✓ ' + Object.keys(
