@@ -1902,14 +1902,12 @@ function renderResumenDifFinales() {
   const box = document.getElementById('resumen-diferencias-finales');
   const tbl = document.getElementById('tablaResumenDifFinales');
   if (!box || !tbl) return;
-  // KPIs accuracy (sobre todos los seriados del cruce)
-  let totSeriados = 0, totPerdidos = 0;
-  state.cruce.forEach(r => {
-    const sis = r.sistemaU || 0;
-    const fis = r.contadoU || 0;
-    totSeriados += sis;
-    if (sis > fis) totPerdidos += (sis - fis);
-  });
+  // KPIs accuracy: perdidos = suma absoluta de diferencias confirmadas en el 3.º conteo
+  // totSeriados = total sistémico de todos los SKUs seriados del cruce
+  let totSeriados = 0;
+  state.cruce.forEach(r => { totSeriados += (r.sistemaU || 0); });
+  let totPerdidos = 0;
+  difs.forEach(r => { totPerdidos += Math.abs(r.diferencia || 0); });
   const accPct = totSeriados > 0 ? (1 - totPerdidos / totSeriados) * 100 : 100;
   const fmtKpi = n => (n||0).toLocaleString('es-MX');
   const eT = document.getElementById('kpiTotalSeriados');
