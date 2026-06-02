@@ -676,6 +676,14 @@ function procesarXLSX(f) {
 
       // Buscar hojas "Segundo conteo" y "Tercer conteo" y mergear sus valores en las filas de la planilla principal
       // por (SKU, Ubicación). Si la combinación no existe, agregar nueva fila.
+      // Pre-indexar filas de la planilla por (SKU,Ubic) y por (Ubic) para lookups O(1)
+      const rowIdxByPair = new Map(); const rowIdxByUbi = new Map();
+      rows.forEach(r => {
+        const rs = normKeyStrong(r['SKU / Código'] || r['SKU'] || r['Código'] || r['Producto'] || '');
+        const ru = normKeyStrong(r['Ubicación / Posición'] || r['Ubicación'] || r['Ubicacion'] || r['UBICACION'] || '');
+        if (rs && ru) rowIdxByPair.set(rs + '||' + ru, r);
+        if (ru && !rowIdxByUbi.has(ru)) rowIdxByUbi.set(ru, r);
+      });
       function readExtraSheet(name, targetField) {
         const sh = wb.SheetNames.find(n => n.toLowerCase().includes(name));
         if (!sh) return 0;
@@ -688,19 +696,14 @@ function procesarXLSX(f) {
           let cant = d['Cantidad fisica'] || d['Cantidad física'] || d['Cantidad'] || d['Cant'] || '';
           if (!ubi || !sku) return;
           const skuN = normKeyStrong(sku); const ubiN = normKeyStrong(ubi);
-          // Buscar fila existente por SKU+Ubic
-          const target = rows.find(r => {
-            const rs = normKeyStrong(r['SKU / Código'] || r['SKU'] || r['Código'] || r['Producto'] || '');
-            const ru = normKeyStrong(r['Ubicación / Posición'] || r['Ubicación'] || r['Ubicacion'] || r['UBICACION'] || '');
-            return rs === skuN && ru === ubiN;
-          });
+          const target = rowIdxByPair.get(skuN + '||' + ubiN);
           if (target) { target[targetField] = cant; merged++; }
           else {
             const obj = {};
             headers.forEach(h => obj[h] = '');
             obj['SKU / Código'] = sku; obj['Ubicación / Posición'] = ubi;
             obj[targetField] = cant;
-            rows.push(obj); added++;
+            rows.push(obj); rowIdxByPair.set(skuN + '||' + ubiN, obj); added++;
           }
         });
         return merged + added;
@@ -2168,13 +2171,4 @@ async function restoreCache() {
       document.getElementById('card-master').classList.add('loaded');
       document.getElementById('status-master').textContent = '✓ ' + Object.keys(mas).length.toLocaleString('es-MX') + ' ubicaciones (compartido)';
     }
-    if (sis || fis || mas) {
-      checkReady();
-      try { renderBases(); } catch(e) {}
-      toast('Datos restaurados — listo para ejecutar', 'ok');
-    }
-  } catch (e) { console.warn('No se pudo restaurar', e); }
-}
-restoreCache();
-
-// Botón para borrar cache (lo agrego al bo
+    if (sis || fis 
