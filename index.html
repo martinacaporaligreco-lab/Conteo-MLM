@@ -673,11 +673,58 @@ function procesarXLSX(f) {
         headers.forEach((h, idx) => { obj[h] = r[idx]; });
         rows.push(obj);
       }
+
+      // Buscar hojas "Segundo conteo" y "Tercer conteo" y mergear sus valores en las filas de la planilla principal
+      // por (SKU, Ubicación). Si la combinación no existe, agregar nueva fila.
+      function readExtraSheet(name, targetField) {
+        const sh = wb.SheetNames.find(n => n.toLowerCase().includes(name));
+        if (!sh) return 0;
+        const w = wb.Sheets[sh];
+        const data = XLSX.utils.sheet_to_json(w, { raw: false, defval: '' });
+        let merged = 0, added = 0;
+        data.forEach(d => {
+          const sku = String(d['SKU'] || d['SKU / Código'] || d['Sku'] || '').trim();
+          const ubi = String(d['Ubicacion'] || d['Ubicación'] || d['Ubicacion '] || d['Ubicación / Posición'] || '').trim();
+          let cant = d['Cantidad fisica'] || d['Cantidad física'] || d['Cantidad'] || d['Cant'] || '';
+          if (!ubi || !sku) return;
+          const skuN = normKeyStrong(sku); const ubiN = normKeyStrong(ubi);
+          // Buscar fila existente por SKU+Ubic
+          const target = rows.find(r => {
+            const rs = normKeyStrong(r['SKU / Código'] || r['SKU'] || r['Código'] || r['Producto'] || '');
+            const ru = normKeyStrong(r['Ubicación / Posición'] || r['Ubicación'] || r['Ubicacion'] || r['UBICACION'] || '');
+            return rs === skuN && ru === ubiN;
+          });
+          if (target) { target[targetField] = cant; merged++; }
+          else {
+            const obj = {};
+            headers.forEach(h => obj[h] = '');
+            obj['SKU / Código'] = sku; obj['Ubicación / Posición'] = ubi;
+            obj[targetField] = cant;
+            rows.push(obj); added++;
+          }
+        });
+        return merged + added;
+      }
+      const c2Count = readExtraSheet('segundo', '2.ª Conteo\nfísico');
+      const c3Count = readExtraSheet('tercer', '3.ª Conteo\nfísico');
+      // Si vino C2 o C3, recalcular Conteo Final = última disponible
+      if (c2Count || c3Count) {
+        const cleanN = v => parseFloat(String(v || '').replace(/[^\d.\-]/g, ''));
+        rows.forEach(r => {
+          const c1 = cleanN(r['1.ª Conteo\nfísico'] || r['1.ª Conteo físico'] || r['1° Conteo']);
+          const c2 = cleanN(r['2.ª Conteo\nfísico'] || r['2.ª Conteo físico'] || r['2° Conteo']);
+          const c3 = cleanN(r['3.ª Conteo\nfísico'] || r['3.ª Conteo físico'] || r['3° Conteo']);
+          const cf = !isNaN(c3) ? c3 : (!isNaN(c2) ? c2 : (isNaN(c1) ? 0 : c1));
+          r['Conteo\nFinal'] = cf;
+        });
+      }
+
       state.fisicoRaw = rows;
       dbSave('fisicoRaw', rows);
       $('card-fisico').classList.remove('error'); $('card-fisico').classList.add('loaded');
-      $('status-fisico').textContent = '✓ ' + rows.length.toLocaleString('es-MX') + ' filas (cacheado)';
-      checkReady(); renderBases(); toast('Físico cargado: ' + rows.length.toLocaleString('es-MX') + ' filas', 'ok');
+      const extraMsg = (c2Count || c3Count) ? ` (+${c2Count} 2.º, +${c3Count} 3.º)` : '';
+      $('status-fisico').textContent = '✓ ' + rows.length.toLocaleString('es-MX') + ' filas' + extraMsg;
+      checkReady(); renderBases(); toast('Físico cargado: ' + rows.length.toLocaleString('es-MX') + ' filas' + extraMsg, 'ok');
     } catch (err) {
       $('card-fisico').classList.add('error'); $('status-fisico').textContent = '[FAIL] ' + err.message; toast('Error Excel: ' + err.message, 'err');
     }
@@ -863,16 +910,20 @@ function ejecutarControl() {
     if (r['ESTADO']) sistemaAgg[key].estados.add(estado);
   });
   const fisicoAgg = {};
+  // Vacío = 0: toda ubicación presente en la planilla cuenta como contada (con 0 si no hay valor)
+  const ubisEnPlanilla = new Set();
   state.fisicoRaw.forEach(r => {
     const sku = normKey(r['SKU / Código'] || r['SKU Código'] || r['SKU'] || r['Código'] || r['Codigo'] || r['Producto'] || r['PRODUCTO']);
     const ubi = normKey(r['Ubicación / Posición'] || r['Ubicación'] || r['Ubicacion'] || r['UBICACION'] || r['Posición'] || r['Posicion']);
+    if (ubi) ubisEnPlanilla.add(ubi);
     if (!sku) return;
     const cleanN = v => parseFloat(String(v || '').replace(/[^\d.\-]/g, ''));
     const cf = cleanN(r['Conteo\nFinal'] || r['Conteo Final'] || r['Uds Contadas'] || r['Final']);
     const c1 = cleanN(r['1.ª Conteo\nfísico'] || r['1.ª Conteo físico'] || r['1° Conteo']);
     const c2 = cleanN(r['2.ª Conteo\nfísico'] || r['2.ª Conteo físico'] || r['2° Conteo']);
     const c3 = cleanN(r['3.ª Conteo\nfísico'] || r['3.ª Conteo físico'] || r['3° Conteo']);
-    const contadoFinal = !isNaN(cf) ? cf : (!isNaN(c3) ? c3 : (!isNaN(c2) ? c2 : (isNaN(c1) ? null : c1)));
+    // Vacío = 0: si ninguna columna trae número, el contadoFinal es 0 (no null)
+    const contadoFinal = !isNaN(cf) ? cf : (!isNaN(c3) ? c3 : (!isNaN(c2) ? c2 : (isNaN(c1) ? 0 : c1)));
     const desc = r['Descripción del producto'] || r['Descripcion del producto'] || r['Descripción'] || '';
     const obs = r['Observaciones / Causa diferencia'] || r['Observaciones'] || '';
     const aj = normKey(r['Ajuste realizado\nen sistema (S/N)'] || r['Ajuste realizado en sistema (S/N)'] || r['Ajuste realizado'] || '');
@@ -920,7 +971,17 @@ function ejecutarControl() {
       else if (dif > 0) res = 'sobrante';
       else res = 'faltante';
     } else if (!s && f) { res = 'solo_fisico'; dif = cU; ex = 0; }
-    else if (s && !f) { ex = 0; dif = -sU; }
+    else if (s && !f) {
+      // Vacío = 0: si la ubicación figura en la planilla, se considera contada con 0
+      if (ubisEnPlanilla.has(s.ubicacion)) {
+        dif = 0 - (sU || 0);
+        ex = 0;
+        if (Math.abs(dif) <= umbral) res = 'ok';
+        else res = 'faltante';
+      } else {
+        ex = 0; dif = -sU;
+      }
+    }
     cruce.push({ sku, ubicacion: ubi, sistemaU: sU, contadoU: cU, diferencia: dif, exactitud: ex, resultado: res,
       lpns: s ? s.lpns : 0, zona: s ? s.zona : '', descripcion: (f && f.descripcion) || (s && s.descripcion) || '',
       estados: s ? Array.from(s.estados).join(', ') : '', observaciones: f ? f.observaciones : '', ajustado: f ? f.ajustado : '' });
@@ -2116,62 +2177,4 @@ async function restoreCache() {
 }
 restoreCache();
 
-// Botón para borrar cache (lo agrego al botón "Nueva ejecución" como acción secundaria)
-async function borrarCache() {
-  await dbClear();
-  toast('Cache borrado · recargá la página', 'ok');
-}
-
-// Borrar archivo de Conteo Físico tanto del IndexedDB como del repo GitHub
-async function borrarFisicoGH(ev) {
-  const btn = ev && ev.currentTarget;
-  // Confirmación en dos pasos en el mismo botón
-  if (btn && !btn.dataset.c) {
-    const o = btn.textContent;
-    btn.dataset.c = '1';
-    btn.textContent = '¿Confirmar? Borra de GitHub';
-    btn.style.background = '#e74c3c';
-    setTimeout(() => { btn.textContent = o; btn.style.background = ''; delete btn.dataset.c; }, 3000);
-    return;
-  }
-  if (btn) { delete btn.dataset.c; btn.style.background = ''; btn.disabled = true; btn.textContent = '⏳ Borrando...'; }
-  try {
-    // 1) Borrar local
-    await dbDelete('fisicoRaw');
-    // 2) Borrar de GitHub (si está configurado)
-    let ghMsg = '';
-    if (ghConfigured()) {
-      ghSyncStatus('saving');
-      const res = await ghDelete('fisicoRaw');
-      if (res.ok) { ghSyncStatus('ok', 'físico eliminado'); ghMsg = ' + GitHub'; }
-      else if (res.reason === 'no_token') { ghSyncStatus('err', 'sin token'); ghMsg = ' (no se pudo GitHub: sin token)'; }
-      else { ghSyncStatus('err', res.reason); ghMsg = ` (no se pudo GitHub: ${res.reason})`; }
-    }
-    // 3) Reset state + UI
-    state.fisico = null; state.fisicoRaw = null;
-    state.cruce = null; state.cobertura = null; state.agregadoCache = null; state.invCache = null;
-    const card = document.getElementById('card-fisico');
-    if (card) card.classList.remove('loaded', 'error');
-    const st = document.getElementById('status-fisico');
-    if (st) st.textContent = 'Sin cargar · click o arrastrá';
-    const fi = document.getElementById('file-fisico');
-    if (fi) fi.value = '';
-    const btnE = document.getElementById('btnExec');
-    if (btnE) btnE.classList.remove('ready');
-    // Recalcular si se puede ejecutar (con solo el sistémico ahora se permite)
-    try { checkReady(); } catch(e) {}
-    toast('Conteo Físico eliminado · local' + ghMsg, 'ok');
-  } catch (e) {
-    console.error('borrarFisicoGH', e);
-    toast('Error al borrar físico: ' + (e.message || e), 'err');
-  } finally {
-    if (btn) { btn.disabled = false; btn.textContent = '🗑 Borrar físico (GitHub)'; }
-  }
-}
-</script>
-
-<div id="gh-token-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9999;align-items:center;justify-content:center;font-family:system-ui,sans-serif">
-  <div style="background:#fff;padding:24px;border-radius:12px;max-width:480px;width:90%;box-shadow:0 10px 40px rgba(0,0,0,0.2)">
-    <h3 style="margin:0 0 8px;color:#1a1a1a">🔑 Token de GitHub</h3>
-    <p style="margin:0 0 12px;color:#555;font-size:14px">Necesitás un Personal Access Token para que los archivos que cargues se vean desde otros navegadores. Lo guardamos solo en tu computadora — se pide una sola vez.</p>
-    <p style="margin:0 0 12px;font-size:13px"><a href="https://github.com/settings/tokens/new?scopes=repo&description=Conteo%20MLM" target="_blank" rel="noopener" style="color:#0366d6">→ Generar token nuevo (scope: repo)</
+// Botón para borrar cache (lo agrego al bo
