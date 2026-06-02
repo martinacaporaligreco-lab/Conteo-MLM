@@ -331,6 +331,10 @@ tbody tr:hover { background: #f8faff; }
     <div class="section-card">
       <div class="section-title">Cruce Sistema ↔ Físico <button class="btn-export" onclick="exportCruce()">⬇ Exportar Excel</button></div>
       <div class="section-desc">Una fila por par SKU + Ubicación. Diferencia = Sistema − Conteo Final.</div>
+      <div id="resumen-diferencias-finales" style="margin:12px 0 16px;display:none">
+        <div style="font-weight:700;margin-bottom:8px;color:#1a2540;font-size:14px">📋 Resumen de diferencias finales (físico vs sistémico)</div>
+        <div class="table-wrap" style="max-width:720px"><table id="tablaResumenDifFinales" style="width:100%;border-collapse:collapse;font-size:13px"></table></div>
+      </div>
       <div class="filter-chips" id="cruceChips" style="display:flex;gap:6px;flex-wrap:wrap;margin:8px 0 12px">
         <span class="chip" data-fl="" onclick="setCruceFilter('')">Todos</span>
         <span class="chip" data-fl="dif" onclick="setCruceFilter('dif')">Con diferencia</span>
@@ -339,7 +343,7 @@ tbody tr:hover { background: #f8faff; }
         <span class="chip" data-fl="sobrante" onclick="setCruceFilter('sobrante')">Sobrantes</span>
         <span class="chip" data-fl="solo_fisico" onclick="setCruceFilter('solo_fisico')">Solo físico</span>
         <span class="chip" data-fl="no_contado" onclick="setCruceFilter('no_contado')">No contado</span>
-        <span class="chip chip-seriado" id="chipSeriados" onclick="toggleSoloSeriados()" title="Mostrar solo SKUs POINT seriados de México">★ Seriados</span>
+        <span class="chip chip-seriado active" id="chipSeriados" title="El tablero está filtrado solo a SKUs seriados de México" style="cursor:default;opacity:0.85">★ Solo seriados</span>
       </div>
       <div class="toolbar">
         <input type="text" class="search" id="searchCruce" placeholder="🔍 Buscar SKU o ubicación..." oninput="renderCruce()">
@@ -991,7 +995,8 @@ function ejecutarControl() {
   });
   cruce.sort((a, b) => Math.abs(b.diferencia || 0) - Math.abs(a.diferencia || 0));
 
-  state.cruce = cruce;
+  // Filtro global: SOLO SKUs seriados de México (POINTs) en todo el tablero
+  state.cruce = cruce.filter(r => SERIADOS_MX.has(String(r.sku||'').toUpperCase().trim()));
   state.invCache = null;
   state.ejecucionFecha = new Date();
 
@@ -1859,8 +1864,55 @@ function toggleCruceSort(col) {
   renderCruce();
 }
 
+function renderResumenDifFinales() {
+  if (!state.cruce) return;
+  // Diferencias reales: ambos > 0 y no coinciden (típicamente FALTANTE confirmado)
+  const difs = state.cruce.filter(r => (r.sistemaU||0) > 0 && (r.contadoU||0) > 0 && (r.sistemaU !== r.contadoU))
+                          .sort((a,b)=> Math.abs(b.diferencia||0) - Math.abs(a.diferencia||0));
+  const box = document.getElementById('resumen-diferencias-finales');
+  const tbl = document.getElementById('tablaResumenDifFinales');
+  if (!box || !tbl) return;
+  if (!difs.length) { box.style.display='none'; return; }
+  box.style.display='';
+  const fmt = n => (n||0).toLocaleString('es-MX');
+  let totalFis=0, totalSis=0, totalDif=0;
+  difs.forEach(r => { totalFis+=r.contadoU||0; totalSis+=r.sistemaU||0; totalDif+=r.diferencia||0; });
+  const cellTh = 'padding:8px 10px;background:#1f3554;color:#fff;font-weight:700;text-align:left;border:1px solid #ccc';
+  const cellThNum = cellTh + ';text-align:right';
+  const cellTd = 'padding:7px 10px;background:#dbe6f4;border:1px solid #c5d3e6';
+  const cellTdSis = 'padding:7px 10px;background:#d6e8d8;border:1px solid #c5d3e6;text-align:right';
+  const cellTdFis = 'padding:7px 10px;background:#dbe6f4;border:1px solid #c5d3e6;text-align:right';
+  const cellTdDif = 'padding:7px 10px;background:#f4d6d6;border:1px solid #c5d3e6;text-align:right;font-weight:600';
+  const cellFoot = 'padding:8px 10px;background:#f5f5f5;border:1px solid #c5d3e6;font-weight:700';
+  tbl.innerHTML = `
+    <thead><tr>
+      <th style="${cellTh}">SKU</th>
+      <th style="${cellTh}">Ubicación</th>
+      <th style="${cellThNum}">Cantidad física</th>
+      <th style="${cellThNum}">Cantidad sistémica</th>
+      <th style="${cellThNum}">Diferencia</th>
+    </tr></thead>
+    <tbody>${difs.map(r=>`
+      <tr>
+        <td style="${cellTd}">${r.sku||''}</td>
+        <td style="${cellTd}">${r.ubicacion||''}</td>
+        <td style="${cellTdFis}">${fmt(r.contadoU)}</td>
+        <td style="${cellTdSis}">${fmt(r.sistemaU)}</td>
+        <td style="${cellTdDif}">${(r.diferencia||0)>0?'+':''}${fmt(r.diferencia)}</td>
+      </tr>`).join('')}
+      <tr>
+        <td style="${cellFoot}">Total</td>
+        <td style="${cellFoot}"></td>
+        <td style="${cellFoot};text-align:right">${fmt(totalFis)}</td>
+        <td style="${cellFoot};text-align:right">${fmt(totalSis)}</td>
+        <td style="${cellFoot};text-align:right">${totalDif>0?'+':''}${fmt(totalDif)}</td>
+      </tr>
+    </tbody>`;
+}
+
 function renderCruce() {
   if (!state.cruce) return;
+  renderResumenDifFinales();
   // Marcar chip activa
   const curFl = ($('filtroCruce') && $('filtroCruce').value) || '';
   document.querySelectorAll('#cruceChips .chip:not(.chip-seriado)').forEach(c => c.classList.toggle('active', (c.getAttribute('data-fl') || '') === curFl));
@@ -2127,21 +2179,17 @@ function exportAjustes() {
   toast('Pendientes: '+d.length,'ok');
 }
 
-// Init
-try { $('cfgFecha').valueAsDate = new Date(); } catch(e) {}
+try { document.getElementById('cfgFecha').valueAsDate = new Date(); } catch(e) {}
 (function libCheck() {
   const ok = { papa: typeof Papa !== 'undefined', xlsx: typeof XLSX !== 'undefined' };
-  const msg = (ok.papa && ok.xlsx) ? '✓ Tablero listo · cargá los archivos' : '⚠ FALTAN LIBRERÍAS — Papa:' + ok.papa + ' XLSX:' + ok.xlsx;
-  $('execMsg').textContent = msg;
-  if (!ok.papa || !ok.xlsx) toast(msg, 'err');
+  const msg = (ok.papa && ok.xlsx) ? '✓ Tablero listo · cargá los archivos' : '⚠ FALTAN LIBRERÍAS';
+  document.getElementById('execMsg').textContent = msg;
 })();
 
-// Restaurar archivos cacheados de IndexedDB al cargar
 async function restoreCache() {
   try {
     let sis=null, fis=null, mas=null, masRaw=null;
-    // 1) intentar desde GitHub (compartido)
-    if (ghConfigured()) {
+    if (typeof ghConfigured === 'function' && ghConfigured()) {
       try {
         [sis, fis, mas, masRaw] = await Promise.all([
           ghLoad('sistemaRaw'), ghLoad('fisicoRaw'), ghLoad('masterIdx'), ghLoad('masterRaw')
@@ -2149,12 +2197,10 @@ async function restoreCache() {
         if (sis || fis || mas) ghSyncStatus('ok','datos cargados desde GitHub');
       } catch(e) { console.warn('ghLoad failed', e); }
     }
-    // 2) fallback IndexedDB local
     if (!sis) sis = await dbLoad('sistemaRaw');
     if (!fis) fis = await dbLoad('fisicoRaw');
     if (!mas) mas = await dbLoad('masterIdx');
     if (!masRaw) masRaw = await dbLoad('masterRaw');
-
     if (sis && sis.length) {
       state.sistemaRaw = sis;
       document.getElementById('card-sistema').classList.add('loaded');
@@ -2180,13 +2226,11 @@ async function restoreCache() {
 }
 restoreCache();
 
-// Botón para borrar cache (lo agrego al botón "Nueva ejecución" como acción secundaria)
 async function borrarCache() {
   await dbClear();
   toast('Cache borrado · recargá la página', 'ok');
 }
 
-// Borrar archivo de Conteo Físico tanto del IndexedDB como del repo GitHub
 async function borrarFisicoGH(ev) {
   const btn = ev && ev.currentTarget;
   if (btn && !btn.dataset.c) {
@@ -2201,12 +2245,12 @@ async function borrarFisicoGH(ev) {
   try {
     await dbDelete('fisicoRaw');
     let ghMsg = '';
-    if (ghConfigured()) {
+    if (typeof ghConfigured === 'function' && ghConfigured()) {
       ghSyncStatus('saving');
       const res = await ghDelete('fisicoRaw');
       if (res.ok) { ghSyncStatus('ok', 'físico eliminado'); ghMsg = ' + GitHub'; }
-      else if (res.reason === 'no_token') { ghSyncStatus('err', 'sin token'); ghMsg = ' (no se pudo GitHub: sin token)'; }
-      else { ghSyncStatus('err', res.reason); ghMsg = ` (no se pudo GitHub: ${res.reason})`; }
+      else if (res.reason === 'no_token') { ghSyncStatus('err', 'sin token'); ghMsg = ' (sin token)'; }
+      else { ghSyncStatus('err', res.reason); ghMsg = ` (no se pudo: ${res.reason})`; }
     }
     state.fisico = null; state.fisicoRaw = null;
     state.cruce = null; state.cobertura = null; state.agregadoCache = null; state.invCache = null;
@@ -2227,7 +2271,6 @@ async function borrarFisicoGH(ev) {
     if (btn) { btn.disabled = false; btn.textContent = '🗑 Borrar físico (GitHub)'; }
   }
 }
-
 </script>
 </body>
 </html>
