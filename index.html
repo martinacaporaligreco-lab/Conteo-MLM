@@ -62,7 +62,10 @@ tfoot td { background: #1e3a5f !important; color: #fff; font-weight: 700; }
 .alert { background: #fff3cd; border-left: 4px solid #f39c12; padding: 12px 16px; border-radius: 6px; margin-bottom: 14px; font-size: 13px; }
 .alert strong { color: #7d6608; }
 @media (max-width: 768px) { .content { padding: 16px; } th, td { padding: 7px 8px; font-size: 12px; } }
+.btn-exp { background: #2ecc71; color: #fff; border: none; padding: 7px 14px; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 600; }
+.btn-exp:hover { background: #27ae60; }
 </style>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 </head>
 <body>
 
@@ -120,7 +123,7 @@ tfoot td { background: #1e3a5f !important; color: #fff; font-weight: 700; }
     </div>
 
     <div class="section">
-      <h2>🎯 Faltantes que van a ajuste (cierre oficial −288 u)</h2>
+      <h2 style="display:flex;justify-content:space-between;align-items:center"><span>🎯 Diferencias</span><button onclick="exportTable(this)" class="btn-exp">⬇ Exportar Excel</button></h2>
       <div class="table-wrap">
       <table>
         <thead><tr><th>Ubicación</th><th>SKU</th><th class="num">Sistema</th><th class="num">1.º</th><th class="num">2.º</th><th class="num">3.º</th><th class="num">Diferencia</th></tr></thead>
@@ -131,8 +134,8 @@ tfoot td { background: #1e3a5f !important; color: #fff; font-weight: 700; }
           <tr class="r-falt"><td>PK-00-03-00</td><td>54AM</td><td class="num">3.140</td><td class="num">3.116</td><td class="num">3.116</td><td class="num">3.116</td><td class="num"><strong>−24</strong></td></tr>
           <tr class="r-falt"><td>PK-00-05-00</td><td>40REF</td><td class="num">511</td><td class="num">502</td><td class="num">502</td><td class="num">502</td><td class="num"><strong>−9</strong></td></tr>
           <tr class="r-falt"><td>RK-0-517-020-00-01</td><td>40AMA</td><td class="num">361</td><td class="num">360</td><td class="num">360</td><td class="num">360</td><td class="num"><strong>−1</strong></td></tr>
-          <tfoot><tr><td colspan="6">TOTAL CIERRE OFICIAL</td><td class="num">−288</td></tr></tfoot>
         </tbody>
+        <tfoot><tr><td colspan="6">TOTAL CIERRE OFICIAL</td><td class="num">−288</td></tr></tfoot>
       </table>
       </div>
     </div>
@@ -140,7 +143,7 @@ tfoot td { background: #1e3a5f !important; color: #fff; font-weight: 700; }
 
   <div class="panel" id="por-sku">
     <div class="section">
-      <h2>🔢 Resumen por SKU</h2>
+      <h2 style="display:flex;justify-content:space-between;align-items:center"><span>🔢 Resumen por SKU</span><button onclick="exportTable(this)" class="btn-exp">⬇ Exportar Excel</button></h2>
       <div class="desc">Datos calculados desde la primera hoja del Cruce_Conteo_vs_Sistema.</div>
       <div class="table-wrap">
       <table>
@@ -154,7 +157,7 @@ tfoot td { background: #1e3a5f !important; color: #fff; font-weight: 700; }
 
   <div class="panel" id="detalle">
     <div class="section">
-      <h2>🔄 Cruce Sistémico vs Físico</h2>
+      <h2 style="display:flex;justify-content:space-between;align-items:center"><span>🔄 Cruce Sistémico vs Físico</span><button onclick="exportTable(this)" class="btn-exp">⬇ Exportar Excel</button></h2>
       <div class="desc">303 ubicaciones POINT seriadas. Las 6 ubicaciones excluidas del cierre oficial tienen la columna A en gris.</div>
       <div class="legend">
         <span><span class="sw" style="background:#fdedec"></span>Faltante</span>
@@ -189,7 +192,7 @@ tfoot td { background: #1e3a5f !important; color: #fff; font-weight: 700; }
       <strong>6 ubicaciones excluidas del cierre oficial (−288 u).</strong> Tienen explicación operativa: SKU SWAP, MAL UBICADO o RESIDUAL.
     </div>
     <div class="section">
-      <h2>⚠️ Excluidas del cierre</h2>
+      <h2 style="display:flex;justify-content:space-between;align-items:center"><span>⚠️ Excluidas del cierre</span><button onclick="exportTable(this)" class="btn-exp">⬇ Exportar Excel</button></h2>
       <div class="table-wrap">
       <table>
         <thead><tr><th>Ubicación</th><th>SKU</th><th class="num">Sistema</th><th class="num">Contado</th><th class="num">Dif</th><th>Tipo</th><th>Compensa con</th><th>Observación</th></tr></thead>
@@ -200,8 +203,8 @@ tfoot td { background: #1e3a5f !important; color: #fff; font-weight: 700; }
           <tr class="resi"><td><strong>JA-00-04-00</strong></td><td>54AM</td><td class="num">1</td><td class="num">0</td><td class="num">−1</td><td><span class="badge b-mal">RESIDUAL</span></td><td>—</td><td>1 u fantasma — bajar de sistema</td></tr>
           <tr class="resi"><td><strong>PK-00-04-00</strong></td><td>40AMA</td><td class="num">1</td><td class="num">0</td><td class="num">−1</td><td><span class="badge b-mal">RESIDUAL</span></td><td>—</td><td>1 u fantasma — bajar de sistema</td></tr>
           <tr class="resi"><td><strong>STG-00-01-00</strong></td><td>40AMA</td><td class="num">1</td><td class="num">0</td><td class="num">−1</td><td><span class="badge b-mal">RESIDUAL</span></td><td>—</td><td>1 u fantasma — bajar de sistema</td></tr>
-          <tfoot><tr><td colspan="2">TOTAL EXCLUIDO</td><td class="num">3.061</td><td class="num">0</td><td class="num">−3.061</td><td colspan="3">No son pérdida real (compensaciones operativas)</td></tr>
         </tbody>
+        <tfoot><tr><td colspan="2">TOTAL EXCLUIDO</td><td class="num">3.061</td><td class="num">0</td><td class="num">−3.061</td><td colspan="3">No son pérdida real (compensaciones operativas)</td></tr></tfoot>
       </table>
       </div>
     </div>
@@ -310,3 +313,23 @@ aggFoot.innerHTML = `<tr>
 </tr>`;
 
 renderDetalle();
+
+function exportTable(btn) {
+  const section = btn.closest('.section');
+  const table = section.querySelector('table');
+  if (!table) { alert('No se encontró tabla'); return; }
+  const h2 = section.querySelector('h2 span');
+  let title = h2 ? h2.textContent.trim() : 'Tabla';
+  title = title.replace(/[^a-zA-Z0-9_áéíóúÁÉÍÓÚñÑ]+/g, '_').replace(/^_|_$/g, '');
+  const tableClone = table.cloneNode(true);
+  tableClone.querySelectorAll('.badge').forEach(b => { b.outerHTML = b.textContent; });
+  tableClone.querySelectorAll('strong').forEach(s => { s.outerHTML = s.textContent; });
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.table_to_sheet(tableClone);
+  XLSX.utils.book_append_sheet(wb, ws, 'Datos');
+  const fecha = new Date().toISOString().slice(0,10);
+  XLSX.writeFile(wb, title + '_' + fecha + '.xlsx');
+}
+</script>
+</body>
+</html>
