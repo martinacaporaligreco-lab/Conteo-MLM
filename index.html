@@ -483,11 +483,11 @@ function renderLpnKpis() {
       totalGeneral += r.u;
     }
   });
-  let html = `<div class="kpi-card success"><div class="kpi-label">TOTAL POINT</div><div class="kpi-value">${fmt(totalGeneral)}</div><div class="kpi-sub">Unidades seriadas</div></div>`;
+  let html = `<div class="kpi-card success"><div class="kpi-label">TOTAL POINT</div><div class="kpi-value">${fmt(totalGeneral)}</div><div class="kpi-sub">Unidades sistémicas</div></div>`;
   SKUS_POINT_MX.forEach(sku => {
     const u = totales[sku] || 0;
     if (u > 0) {
-      html += `<div class="kpi-card"><div class="kpi-label">${sku}</div><div class="kpi-value" style="font-size:18px">${fmt(u)}</div></div>`;
+      html += `<div class="kpi-card"><div class="kpi-label">${sku}</div><div class="kpi-value" style="font-size:18px">${fmt(u)}</div><div class="kpi-sub">Unidades sistémicas</div></div>`;
     }
   });
   kpis.innerHTML = html;
@@ -528,16 +528,14 @@ function renderLpnStock() {
   }
   
   let count = 0, totU = 0;
+  const rowsHtml = [];
   filas.forEach(r => {
     const cls = r.vacia ? 'r-falt' : (r.p === 1 ? 'r-ok' : '');
-    body.innerHTML += `<tr class="${cls}">
-      <td><strong>${r.ubi}</strong></td>
-      <td>${r.sku || '<em style="color:#999">— vacía —</em>'}</td>
-      <td class="num">${r.u > 0 ? fmt(r.u) : '0'}</td>
-    </tr>`;
+    rowsHtml.push(`<tr class="${cls}"><td><strong>${r.ubi}</strong></td><td>${r.sku || '<em style="color:#999">— vacía —</em>'}</td><td class="num">${r.u > 0 ? fmt(r.u) : '0'}</td></tr>`);
     count++;
     totU += r.u;
   });
+  body.innerHTML = rowsHtml.join('');
   
   const stats = document.getElementById('lpnStats');
   if (stats) stats.innerHTML = `Mostrando <strong>${count}</strong> registros · Total unidades: <strong>${fmt(totU)}</strong>`;
