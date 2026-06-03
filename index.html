@@ -178,7 +178,7 @@ tfoot td { background: #1e3a5f !important; color: #fff; font-weight: 700; }
 
   <div class="panel" id="conteo-fisico">
     <div class="section">
-      <h2 style="display:flex;justify-content:space-between;align-items:center"><span>📋 Conteo Físico — Planilla Operativa (1.074 filas)</span><button onclick="exportTable(this)" class="btn-exp">⬇ Exportar Excel</button></h2>
+      <h2 style="display:flex;justify-content:space-between;align-items:center"><span>📋 Conteo Físico — 1.074 filas (v.20)</span><button onclick="exportTable(this)" class="btn-exp">⬇ Exportar Excel</button></h2>
       <p style="color:#5a6378;font-size:13px;margin-bottom:12px">Detalle por ubicación según planilla de inventario física. Sistema desde LPN Cajas (UNID. TOT.) por (Ubicación, SKU).</p>
       <div id="cfKpis" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px;margin-bottom:16px"></div>
       <div style="margin-bottom:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
@@ -425,8 +425,10 @@ function renderCfKpis() {
 function renderConteoFisico() {
   const body = document.getElementById('conteoFisicoBody');
   if (!body) return;
-  const filtro = (document.getElementById('cfFiltro')?.value || '').toUpperCase();
+  const filtroInput = document.getElementById('cfFiltro');
+  const filtro = (filtroInput && filtroInput.value || '').trim().toUpperCase();
   const soloConDatos = document.getElementById('cfSoloConDatos')?.checked || false;
+  console.log('[CF] Render. Total filas:', CONTEO_FISICO.length, 'filtro:', JSON.stringify(filtro));
   
   // Indexar DATA por (ubi, sku) para lookup de sistema
   const sisIdx = {};
@@ -464,7 +466,11 @@ function renderConteoFisico() {
     const conDatos = sis > 0 || c1 > 0 || c2 > 0 || c3 > 0;
     
     // Filtros
-    if (filtro && !(r.ubi.toUpperCase().includes(filtro) || (r.sku || '').toUpperCase().includes(filtro))) return;
+    if (filtro) {
+      const ubiU = (r.ubi || '').toUpperCase();
+      const skuU = (r.sku || '').toUpperCase();
+      if (!(ubiU.includes(filtro) || skuU.includes(filtro))) return;
+    }
     if (soloConDatos && !conDatos) return;
     
     const conteoFinal = c3 > 0 ? c3 : (c2 > 0 ? c2 : c1);
