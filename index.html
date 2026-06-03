@@ -253,7 +253,10 @@ document.querySelectorAll('.chip').forEach(c => {
     document.querySelectorAll('.chip').forEach(x => x.classList.remove('active'));
     c.classList.add('active');
     currentFilter = c.dataset.filter;
-    
+    renderDetalle();
+  });
+});
+
 function renderDiferencias() {
   const body = document.getElementById('diferenciasBody');
   if (!body) return;
@@ -281,11 +284,6 @@ function renderDiferencias() {
     </tr>`;
   });
 }
-
-renderDetalle();
-renderDiferencias();
-  });
-});
 
 // Render por SKU
 const aggBody = document.getElementById('aggBody');
@@ -316,6 +314,7 @@ aggFoot.innerHTML = `<tr>
 </tr>`;
 
 renderDetalle();
+renderDiferencias();
 
 function exportTable(btn) {
   const section = btn.closest('.section');
@@ -336,3 +335,4 @@ function exportTable(btn) {
 </script>
 </body>
 </html>
+ 
