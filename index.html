@@ -468,23 +468,22 @@ function renderConteoFisico() {
     
     const conteoFinal = c3 > 0 ? c3 : (c2 > 0 ? c2 : c1);
     const dif = conteoFinal - sis;
-    let cls = '';
-    if (sis > 0 || c1 > 0 || c2 > 0 || c3 > 0) {
-      if (dif < 0) cls = 'r-falt';
-      else if (dif > 0) cls = 'r-sob';
-      else cls = 'r-ok';
+    let difStyle = '';
+    if (conDatos) {
+      if (dif < 0) difStyle = 'background:#fadbd8;color:#c0392b;font-weight:700';
+      else if (dif > 0) difStyle = 'background:#fcf3cf;color:#b7950b;font-weight:700';
+      else difStyle = 'background:#d5f5e3;color:#1e7e3b;font-weight:700';
     }
-    
-    body.innerHTML += `<tr class="${cls}">
-      <td style="color:#999;font-size:11px">${r.num}</td>
-      <td><strong>${r.ubi}</strong></td>
-      <td>${r.sku || ''}</td>
-      <td class="num">${sis > 0 ? fmt(sis) : ''}</td>
-      <td class="num">${c1 > 0 ? fmt(c1) : ''}</td>
-      <td class="num">${c2 > 0 ? fmt(c2) : ''}</td>
-      <td class="num">${c3 > 0 ? fmt(c3) : ''}</td>
-      <td class="num">${conDatos ? (dif > 0 ? '+' : '') + fmt(dif) : ''}</td>
-    </tr>`;
+    body.innerHTML += '<tr>' +
+      '<td style="color:#999;font-size:11px">' + r.num + '</td>' +
+      '<td><b>' + r.ubi + '</b></td>' +
+      '<td>' + (r.sku || '') + '</td>' +
+      '<td class=\"num\">' + (sis > 0 ? fmt(sis) : '') + '</td>' +
+      '<td class=\"num\">' + (c1 > 0 ? fmt(c1) : '') + '</td>' +
+      '<td class=\"num\">' + (c2 > 0 ? fmt(c2) : '') + '</td>' +
+      '<td class=\"num\">' + (c3 > 0 ? fmt(c3) : '') + '</td>' +
+      '<td class=\"num\" style=\"' + difStyle + '\">' + (conDatos ? (dif > 0 ? '+' : '') + fmt(dif) : '') + '</td>' +
+      '</tr>';
     count++;
     totSis += sis; totC1 += c1; totC2 += c2; totC3 += c3;
   });
